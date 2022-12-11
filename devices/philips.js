@@ -4,6 +4,7 @@ const tz = require('../converters/toZigbee');
 const ota = require('../lib/ota');
 const reporting = require('../lib/reporting');
 const globalStore = require('../lib/store');
+const philips = require('../lib/philips');
 const utils = require('../lib/utils');
 const e = exposes.presets;
 const ea = exposes.access;
@@ -39,6 +40,30 @@ const hueExtend = {
         meta: {turnsOffAtBrightness1: true},
         toZigbee: extendDontUse.light_onoff_brightness_colortemp_color({supportsHS: true, ...options})
             .toZigbee.concat([tz.hue_power_on_behavior, tz.hue_power_on_error]),
+    }),
+    light_onoff_brightness_colortemp_color_gradient: (options={}) => ({
+        ...extendDontUse.light_onoff_brightness_colortemp_color({supportsHS: true, noConfigure: true, ...options}),
+        ota: ota.zigbeeOTA,
+        meta: {turnsOffAtBrightness1: true},
+        configure: async (device, coordinatorEndpoint, logger) => {
+            await extendDontUse.light_onoff_brightness_colortemp_color({supportsHS: true, ...options})
+                .configure(device, coordinatorEndpoint, logger);
+            for (const ep of device.endpoints) {
+                await ep.bind('manuSpecificPhilips2', coordinatorEndpoint);
+            }
+        },
+        exposes: extendDontUse.light_onoff_brightness_colortemp_color({supportsHS: true, ...options}).exposes.concat([
+            // gradient_scene is deprecated, use gradient instead
+            exposes.enum('gradient_scene', ea.SET, Object.keys(gradientScenes)),
+            exposes.list('gradient', ea.ALL, exposes.text('hex', 'Color in RGB HEX format (eg #663399)'))
+                .withLengthMin(1)
+                .withLengthMax(9)
+                .withDescription('List of RGB HEX colors'),
+        ]),
+        fromZigbee: extendDontUse.light_onoff_brightness_colortemp_color({supportsHS: true, ...options}).fromZigbee.concat(
+            [fzLocal.gradient({reverse: true})]),
+        toZigbee: extendDontUse.light_onoff_brightness_colortemp_color({supportsHS: true, ...options}).toZigbee.concat(
+            [tz.hue_power_on_behavior, tz.hue_power_on_error, tzLocal.gradient_scene, tzLocal.gradient({reverse: true})]),
     }),
 };
 
@@ -81,6 +106,20 @@ const fzLocal = {
             }
             return payload;
         },
+    },
+    gradient: (opts = {reverse: false}) => {
+        return {
+            cluster: 'manuSpecificPhilips2',
+            type: ['attributeReport', 'readResponse'],
+            convert: (model, msg, publish, options, meta) => {
+                if (msg.data.hasOwnProperty('state')) {
+                    const input = msg.data['state'].toString('hex');
+                    const gradient = philips.decodeGradientColors(input, opts);
+                    return {gradient: gradient.colors};
+                }
+                return {};
+            },
+        };
     },
 };
 
@@ -171,6 +210,19 @@ const tzLocal = {
             const payload = {data: Buffer.from(scene, 'hex')};
             await entity.command('manuSpecificPhilips2', 'multiColor', payload);
         },
+    },
+    gradient: (opts = {reverse: false}) => {
+        return {
+            key: ['gradient'],
+            convertSet: async (entity, key, value, meta) => {
+                const scene = philips.encodeGradientColors(value, opts);
+                const payload = {data: Buffer.from(scene, 'hex')};
+                await entity.command('manuSpecificPhilips2', 'multiColor', payload);
+            },
+            convertGet: async (entity, key, meta) => {
+                await entity.read('manuSpecificPhilips2', ['state']);
+            },
+        };
     },
 };
 
@@ -662,8 +714,15 @@ module.exports = [
         zigbeeModel: ['1740193P0'],
         model: '1740193P0',
         vendor: 'Philips',
-        description: 'Hue Lucca wall light',
+        description: 'Hue White Lucca wall light',
         extend: hueExtend.light_onoff_brightness(),
+    },
+    {
+        zigbeeModel: ['929003089301'],
+        model: '929003089301',
+        vendor: 'Philips',
+        description: 'Hue White and Color Ambiance Lucca wall light',
+        extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
     },
     {
         zigbeeModel: ['1740293P0'],
@@ -1271,8 +1330,15 @@ module.exports = [
         zigbeeModel: ['LCW002', '4090230P9', '929003053101'],
         model: '4090230P9',
         vendor: 'Philips',
-        description: 'Hue Liane',
-        extend: hueExtend.light_onoff_brightness_colortemp_color(),
+        description: 'Hue Liane (black)',
+        extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
+    },
+    {
+        zigbeeModel: ['929003053201'],
+        model: '929003053201',
+        vendor: 'Philips',
+        description: 'Hue Liane (white)',
+        extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
     },
     {
         zigbeeModel: ['4090231P9'],
@@ -1636,20 +1702,14 @@ module.exports = [
         model: '4080248U9',
         vendor: 'Philips',
         description: 'Hue White and color ambiance Signe floor light',
-        toZigbee: [tzLocal.gradient_scene, ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).toZigbee],
-        exposes: [exposes.enum('gradient_scene', ea.SET, Object.keys(gradientScenes)),
-            ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).exposes],
-        extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
+        extend: hueExtend.light_onoff_brightness_colortemp_color_gradient({colorTempRange: [153, 500]}),
     },
     {
         zigbeeModel: ['915005987601'],
         model: '915005987601',
         vendor: 'Philips',
         description: 'Hue Gradient Signe floor lamp (black)',
-        toZigbee: [tzLocal.gradient_scene, ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).toZigbee],
-        exposes: [exposes.enum('gradient_scene', ea.SET, Object.keys(gradientScenes)),
-            ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).exposes],
-        extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
+        extend: hueExtend.light_onoff_brightness_colortemp_color_gradient({colorTempRange: [153, 500]}),
     },
     {
         zigbeeModel: ['LCT020'],
@@ -2372,7 +2432,7 @@ module.exports = [
         extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
     },
     {
-        zigbeeModel: ['5041131P9', '5041148P9'],
+        zigbeeModel: ['5041131P9', '5041148P9', '929003047301'],
         model: '5041131P9',
         vendor: 'Philips',
         description: 'Hue White ambiance Milliskin',
@@ -2940,19 +3000,27 @@ module.exports = [
         model: '929003535301',
         vendor: 'Philips',
         description: 'Hue Festavia gradient light string 250',
-        toZigbee: [tzLocal.gradient_scene, ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).toZigbee],
-        exposes: [exposes.enum('gradient_scene', ea.SET, Object.keys(gradientScenes)),
-            ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).exposes],
-        extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
+        extend: hueExtend.light_onoff_brightness_colortemp_color_gradient({colorTempRange: [153, 500]}),
     },
     {
         zigbeeModel: ['915005987101'],
         model: '915005987101',
         vendor: 'Philips',
         description: 'Hue Gradient Signe floor lamp (white)',
-        toZigbee: [tzLocal.gradient_scene, ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).toZigbee],
-        exposes: [exposes.enum('gradient_scene', ea.SET, Object.keys(gradientScenes)),
-            ...hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}).exposes],
+        extend: hueExtend.light_onoff_brightness_colortemp_color_gradient({colorTempRange: [153, 500]}),
+    },
+    {
+        zigbeeModel: ['929003526301'],
+        model: '929003526301',
+        vendor: 'Philips',
+        description: 'Hue White & Color Ambiance Xamento M',
         extend: hueExtend.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
+    },
+    {
+        zigbeeModel: ['LWE008'],
+        model: '929003021301',
+        vendor: 'Philips',
+        description: 'Hue White E17 470 lumen',
+        extend: hueExtend.light_onoff_brightness(),
     },
 ];

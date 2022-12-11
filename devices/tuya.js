@@ -470,11 +470,10 @@ const fzLocal = {
     TS0201_humidity: {
         ...fz.humidity,
         convert: (model, msg, publish, options, meta) => {
-            const result = fz.humidity.convert(model, msg, publish, options, meta);
             if (meta.device.manufacturerName === '_TZ3000_ywagc4rj') {
-                result.humidity = result.humidity * 10;
+                msg.data['measuredValue'] *= 10;
             }
-            return result;
+            return fz.humidity.convert(model, msg, publish, options, meta);
         },
     },
     TS0222: {
@@ -970,6 +969,13 @@ module.exports = [
         description: 'Dry contact relay switch',
         extend: tuya.extend.switch(),
         whiteLabel: [{vendor: 'KTNNKG', model: 'ZB1248-10A'}],
+    },
+    {
+        zigbeeModel: ['CK-BL702-AL-01(7009_Z102LG03-1)'],
+        model: 'CK-BL702-AL-01',
+        vendor: 'TuYa',
+        description: 'Zigbee LED bulb',
+        extend: extend.light_onoff_brightness_colortemp_color({colorTempRange: [142, 500]}),
     },
     {
         zigbeeModel: ['TS0505B'],
@@ -1988,6 +1994,7 @@ module.exports = [
             {modelID: 'TS0601', manufacturerName: '_TZE200_g5wdnuow'},
             // Tubular motors:
             {modelID: 'TS0601', manufacturerName: '_TZE200_5sbebbzs'},
+            {modelID: 'TS0601', manufacturerName: '_TZE200_udank5zs'},
             {modelID: 'TS0601', manufacturerName: '_TZE200_zuz7f94z'},
             {modelID: 'TS0601', manufacturerName: '_TZE200_68nvbio9'},
         ],
@@ -2028,6 +2035,7 @@ module.exports = [
         fingerprint: [
             {modelID: 'TS0601', manufacturerName: '_TZE200_ckud7u2l'},
             {modelID: 'TS0601', manufacturerName: '_TZE200_ywdxldoj'},
+            {modelID: 'TS0601', manufacturerName: '_TZE200_do5qy8zo'},
             {modelID: 'TS0601', manufacturerName: '_TZE200_cwnjrr72'},
             {modelID: 'TS0601', manufacturerName: '_TZE200_pvvbommb'},
             {modelID: 'TS0601', manufacturerName: '_TZE200_9sfg7gm0'}, // HomeCloud
@@ -2080,6 +2088,7 @@ module.exports = [
     },
     {
         fingerprint: tuya.fingerprint('TS0601', [
+            '_TZE200_sur6q7ko', /* model: '3012732', vendor: 'LSC Smart Connect' */
             '_TZE200_hue3yfsn', /* model: 'TV02-Zigbee', vendor: 'TuYa' */
             '_TZE200_e9ba97vf', /* model: 'TV01-ZB', vendor: 'Moes' */
             '_TZE200_husqqvux', /* model: 'TSL-TRV-TV01ZG', vendor: 'Tesla Smart' */
@@ -2088,7 +2097,6 @@ module.exports = [
             '_TZE200_mudxchsu', /* model: 'TV05-ZG curve', vendor: 'TuYa' */
             '_TZE200_7yoranx2', /* model: 'TV01-ZB', vendor: 'Moes' */
             '_TZE200_kds0pmmv', /* model: 'TV01-ZB', vendor: 'Moes' */
-            '_TZE200_bvu2wnxz', /* model: 'ME167', vendor: 'Avatto' */
         ]),
         model: 'TV02-Zigbee',
         vendor: 'TuYa',
@@ -2151,7 +2159,7 @@ module.exports = [
                 [10, 'frost_protection', tuya.valueConverter.TV02FrostProtection],
                 [16, 'current_heating_setpoint', tuya.valueConverter.divideBy10],
                 [24, 'local_temperature', tuya.valueConverter.divideBy10],
-                [27, 'local_temperature_calibration', tuya.valueConverter.localTempCalibration],
+                [27, 'local_temperature_calibration', tuya.valueConverter.localTempCalibration1],
                 [31, 'working_day', tuya.valueConverterBasic.lookup({'mon_sun': tuya.enum(0), 'mon_fri+sat+sun': tuya.enum(1),
                     'separate': tuya.enum(2)})],
                 [32, 'holiday_temperature', tuya.valueConverter.divideBy10],
@@ -2201,7 +2209,7 @@ module.exports = [
                 [10, 'frost_protection', tuya.valueConverter.onOff],
                 [16, 'current_heating_setpoint', tuya.valueConverter.divideBy10],
                 [24, 'local_temperature', tuya.valueConverter.divideBy10],
-                [27, 'local_temperature_calibration', tuya.valueConverter.localTempCalibration],
+                [27, 'local_temperature_calibration', tuya.valueConverter.localTempCalibration1],
                 [35, 'battery_low', tuya.valueConverter.true0ElseFalse],
                 [40, 'child_lock', tuya.valueConverter.lockUnlock],
                 [45, 'error_status', tuya.valueConverter.raw],
@@ -2224,6 +2232,50 @@ module.exports = [
                 .withSetpoint('current_heating_setpoint', 5, 30, 0.5, ea.STATE_SET),
             ...tuya.exposes.scheduleAllDays(ea.STATE_SET, 'HH:MM/C HH:MM/C HH:MM/C HH:MM/C'),
         ],
+    },
+    {
+        fingerprint: tuya.fingerprint('TS0601', [
+            '_TZE200_bvu2wnxz', /* model: 'ME167', vendor: 'Avatto' */
+            '_TZE200_6rdj8dzm', /* model: 'ME167', vendor: 'Avatto' */
+        ]),
+        model: 'TS0601_thermostat_3',
+        vendor: 'TuYa',
+        description: 'Thermostatic radiator valve',
+        fromZigbee: [tuya.fzDataPoints],
+        toZigbee: [tuya.tzDataPoints],
+        whiteLabel: [{vendor: 'Avatto', model: 'ME167'}],
+        onEvent: tuya.onEventSetTime,
+        configure: tuya.configureMagicPacket,
+        exposes: [
+            e.child_lock(), e.battery_low(),
+            exposes.climate()
+                .withSetpoint('current_heating_setpoint', 5, 35, 1, ea.STATE_SET)
+                .withLocalTemperature(ea.STATE)
+                .withSystemMode(['auto', 'heat', 'off'], ea.STATE_SET)
+                .withRunningState(['idle', 'heat'], ea.STATE)
+                .withLocalTemperatureCalibration(-3, 3, 1, ea.STATE_SET),
+            exposes.binary('scale_protection', ea.STATE_SET, 'ON', 'OFF').withDescription('If the heat sink is not fully opened within ' +
+                'two weeks or is not used for a long time, the valve will be blocked due to silting up and the heat sink will not be ' +
+                'able to be used. To ensure normal use of the heat sink, the controller will automatically open the valve fully every ' +
+                'two weeks. It will run for 30 seconds per time with the screen displaying "Ad", then return to its normal working state ' +
+                'again.'),
+            exposes.binary('frost_protection', ea.STATE_SET, 'ON', 'OFF').withDescription('When the room temperature is lower than ' +
+                '5 °C, the valve opens; when the temperature rises to 8 °C, the valve closes.'),
+            exposes.numeric('error', ea.STATE).withDescription('If NTC is damaged, "Er" will be on the TRV display.'),
+        ],
+        meta: {
+            tuyaDatapoints: [
+                [2, 'system_mode', tuya.valueConverterBasic.lookup({'auto': tuya.enum(0), 'heat': tuya.enum(1), 'off': tuya.enum(2)})],
+                [3, 'running_state', tuya.valueConverterBasic.lookup({'heat': tuya.enum(0), 'idle': tuya.enum(1)})],
+                [4, 'current_heating_setpoint', tuya.valueConverter.divideBy10],
+                [5, 'local_temperature', tuya.valueConverter.divideBy10],
+                [7, 'child_lock', tuya.valueConverter.lockUnlock],
+                [35, null, tuya.valueConverter.errorOrBatteryLow],
+                [36, 'frost_protection', tuya.valueConverter.onOff],
+                [39, 'scale_protection', tuya.valueConverter.onOff],
+                [47, 'local_temperature_calibration', tuya.valueConverter.localTempCalibration2],
+            ],
+        },
     },
     {
         fingerprint: [
@@ -2443,13 +2495,20 @@ module.exports = [
     },
     {
         zigbeeModel: ['5p1vj8r'],
-        fingerprint: [{modelID: 'TS0601', manufacturerName: '_TZE200_t5p1vj8r'}, {modelID: 'TS0601', manufacturerName: '_TZE200_uebojraa'}],
+        fingerprint: tuya.fingerprint('TS0601', ['_TZE200_t5p1vj8r', '_TZE200_uebojraa', '_TZE200_vzekyi4c', '_TZE200_yh7aoahi']),
         model: 'TS0601_smoke',
         vendor: 'TuYa',
         description: 'Smoke sensor',
-        fromZigbee: [fz.tuya_smoke],
-        toZigbee: [],
-        exposes: [e.smoke(), e.battery()],
+        fromZigbee: [tuya.fz.datapoints],
+        toZigbee: [tuya.tz.datapoints],
+        exposes: [e.smoke(), e.battery(), tuya.exposes.batteryState()],
+        meta: {
+            tuyaDatapoints: [
+                [1, 'smoke', tuya.valueConverter.true0ElseFalse],
+                [14, 'battery_state', tuya.valueConverter.batteryState],
+                [15, 'battery', tuya.valueConverter.raw],
+            ],
+        },
     },
     {
         fingerprint: [{modelID: 'TS0601', manufacturerName: '_TZE200_5d3vhjro'}],
@@ -2776,10 +2835,8 @@ module.exports = [
         },
     },
     {
-        fingerprint: [{modelID: 'TS0014', manufacturerName: '_TZ3000_jr2atpww'}, {modelID: 'TS0014', manufacturerName: '_TYZB01_dvakyzhd'},
-            {modelID: 'TS0014', manufacturerName: '_TZ3210_w3hl6rao'}, {modelID: 'TS0014', manufacturerName: '_TYZB01_bagt1e4o'},
-            {modelID: 'TS0014', manufacturerName: '_TZ3000_r0pmi2p3'}, {modelID: 'TS0014', manufacturerName: '_TZ3000_fxjdcikv'},
-            {modelID: 'TS0014', manufacturerName: '_TZ3000_q6vxaod1'}],
+        fingerprint: tuya.fingerprint('TS0014', ['_TZ3000_jr2atpww', '_TYZB01_dvakyzhd', '_TZ3000_mrduubod',
+            '_TZ3210_w3hl6rao', '_TYZB01_bagt1e4o', '_TZ3000_r0pmi2p3', '_TZ3000_fxjdcikv', '_TZ3000_q6vxaod1']),
         model: 'TS0014',
         vendor: 'TuYa',
         description: 'Smart light switch - 4 gang without neutral wire',
@@ -3029,7 +3086,8 @@ module.exports = [
         fingerprint: [{modelID: 'TS0210', manufacturerName: '_TYZB01_3zv6oleo'},
             {modelID: 'TS0210', manufacturerName: '_TYZB01_j9xxahcl'},
             {modelID: 'TS0210', manufacturerName: '_TYZB01_kulduhbj'},
-            {modelID: 'TS0210', manufacturerName: '_TZ3000_bmfw9ykl'}],
+            {modelID: 'TS0210', manufacturerName: '_TZ3000_bmfw9ykl'},
+            {modelID: 'TS0210', manufacturerName: '_TZ3000_fkxmyics'}],
         model: 'TS0210',
         vendor: 'TuYa',
         description: 'Vibration sensor',
@@ -3205,7 +3263,7 @@ module.exports = [
         model: 'TS0046',
         vendor: 'TuYa',
         description: 'Wireless switch with 6 buttons',
-        whiteLabel: [{vendor: 'LoraTap', model: 'TS0046'}],
+        whiteLabel: [{vendor: 'LoraTap', model: 'SS9600ZB'}],
         fromZigbee: [fz.tuya_on_off_action, fz.battery],
         exposes: [e.battery(), e.action(['1_single', '1_double', '1_hold', '2_single', '2_double', '2_hold',
             '3_single', '3_double', '3_hold', '4_single', '4_double', '4_hold',
