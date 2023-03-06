@@ -1925,7 +1925,9 @@ module.exports = [
         toZigbee: [tz.on_off, tz.xiaomi_power, tz.xiaomi_switch_power_outage_memory, tz.xiaomi_auto_off, tz.xiaomi_led_disabled_night,
             tz.xiaomi_overload_protection],
         exposes: [
-            e.switch(), e.power().withAccess(ea.STATE), e.energy(), e.device_temperature().withAccess(ea.STATE),
+            e.switch(), exposes.numeric('power', ea.STATE).withUnit('W').withDescription('Instantaneous measured power'),
+            e.power().withAccess(ea.STATE),
+            e.energy(), e.device_temperature().withAccess(ea.STATE),
             e.voltage(), e.current(), e.consumer_connected(), e.led_disabled_night(),
             e.power_outage_memory(), exposes.binary('auto_off', ea.STATE_SET, true, false)
                 .withDescription('Turn the device automatically off when attached device consumes less than 2W for 20 minutes'),
