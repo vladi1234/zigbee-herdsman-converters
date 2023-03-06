@@ -5,6 +5,7 @@ const tz = require('../converters/toZigbee');
 const constants = require('../lib/constants');
 const reporting = require('../lib/reporting');
 const globalStore = require('../lib/store');
+const ota = require('../lib/ota');
 const utils = require('../lib/utils');
 const extend = require('../lib/extend');
 const ea = exposes.access;
@@ -115,6 +116,7 @@ module.exports = [
         vendor: 'Namron',
         description: 'ZigBee dimmer 400W',
         extend: extend.light_onoff_brightness({noConfigure: true}),
+        ota: ota.zigbeeOTA,
         configure: async (device, coordinatorEndpoint, logger) => {
             await extend.light_onoff_brightness().configure(device, coordinatorEndpoint, logger);
             const endpoint = device.getEndpoint(1);
@@ -159,6 +161,7 @@ module.exports = [
             await reporting.bind(endpoint, coordinatorEndpoint, ['genOnOff']);
             await reporting.onOff(endpoint);
         },
+        ota: ota.zigbeeOTA,
     },
     {
         zigbeeModel: ['1402755'],
@@ -190,6 +193,7 @@ module.exports = [
         endpoint: (device) => {
             return {l1: 1, l2: 2, l3: 3, l4: 4};
         },
+        ota: ota.zigbeeOTA,
     },
     {
         zigbeeModel: ['4512721'],
@@ -207,6 +211,7 @@ module.exports = [
         endpoint: (device) => {
             return {l1: 1, l2: 2, l3: 3, l4: 4};
         },
+        ota: ota.zigbeeOTA,
     },
     {
         zigbeeModel: ['4512701'],
@@ -231,7 +236,7 @@ module.exports = [
         zigbeeModel: ['4512719'],
         model: '4512719',
         vendor: 'Namron',
-        description: 'Zigbee 2 channel switch K4 white',
+        description: 'Zigbee 2 channel switch K4 (white)',
         fromZigbee: [fz.command_on, fz.command_off, fz.battery, fz.command_move, fz.command_stop],
         meta: {multiEndpoint: true},
         exposes: [e.battery(), e.action(['on_l1', 'off_l1', 'brightness_move_up_l1', 'brightness_move_down_l1', 'brightness_stop_l1',
@@ -240,6 +245,7 @@ module.exports = [
         endpoint: (device) => {
             return {l1: 1, l2: 2};
         },
+        ota: ota.zigbeeOTA,
     },
     {
         zigbeeModel: ['4512726'],
@@ -259,12 +265,13 @@ module.exports = [
             await reporting.batteryPercentageRemaining(endpoint);
             await reporting.batteryVoltage(endpoint);
         },
+        ota: ota.zigbeeOTA,
     },
     {
         zigbeeModel: ['4512729'],
         model: '4512729',
         vendor: 'Namron',
-        description: 'Zigbee 2 channel switch K4 white',
+        description: 'Zigbee 2 channel switch K4 (black)',
         fromZigbee: [fz.command_on, fz.command_off, fz.battery, fz.command_move, fz.command_stop],
         meta: {multiEndpoint: true},
         exposes: [e.battery(), e.action(['on_l1', 'off_l1', 'brightness_move_up_l1', 'brightness_move_down_l1', 'brightness_stop_l1',
@@ -273,6 +280,7 @@ module.exports = [
         endpoint: (device) => {
             return {l1: 1, l2: 2};
         },
+        ota: ota.zigbeeOTA,
     },
     {
         zigbeeModel: ['4512706'],
@@ -298,6 +306,7 @@ module.exports = [
         description: 'Zigbee 4 channel remote control',
         fromZigbee: [fz.command_on, fz.command_off, fz.battery, fz.command_move, fz.command_stop, fz.command_recall],
         toZigbee: [],
+        ota: ota.zigbeeOTA,
         exposes: [e.battery(), e.action([
             'on_l1', 'off_l1', 'brightness_move_up_l1', 'brightness_move_down_l1', 'brightness_stop_l1',
             'on_l2', 'off_l2', 'brightness_move_up_l2', 'brightness_move_down_l2', 'brightness_stop_l2',
@@ -421,13 +430,14 @@ module.exports = [
                 .withDescription('The threshold to detect window open, between 1.5 and 4 in 0.5 °C.  Default: 0 (disabled).'),
             exposes.numeric('hysterersis', ea.ALL)
                 .withUnit('°C')
-                .withValueMin(0.5).withValueMax(2).withValueStep(0.1)
-                .withDescription('Hysteresis setting, between 0.5 and 2 in 0.1 °C.  Default: 0.5.'),
+                .withValueMin(0.5).withValueMax(5).withValueStep(0.1)
+                .withDescription('Hysteresis setting, between 0.5 and 5 in 0.1 °C.  Default: 0.5.'),
             exposes.enum('display_auto_off_enabled', ea.ALL, ['enabled', 'disabled']),
             exposes.numeric('alarm_airtemp_overvalue', ea.ALL)
                 .withUnit('°C')
-                .withValueMin(20).withValueMax(60)
-                .withDescription('Room temperature alarm threshold, between 20 and 60 in °C.  0 means disabled.  Default: 45.'),
+                .withValueMin(0).withValueMax(35)
+                .withDescription('Floor temperature over heating threshold, range is 0-35, unit is 1ºC, ' +
+                '0 means this function is disabled, default value is 27.'),
         ],
         onEvent: async (type, data, device, options) => {
             const endpoint = device.getEndpoint(1);
@@ -457,7 +467,7 @@ module.exports = [
             await reporting.bind(endpoint, coordinatorEndpoint, binds);
 
             // standard ZCL attributes
-            await reporting.thermostatTemperature(endpoint);
+            await reporting.thermostatTemperature(endpoint, {min: 0, change: 50});
             await reporting.thermostatOccupiedHeatingSetpoint(endpoint);
             await reporting.thermostatUnoccupiedHeatingSetpoint(endpoint);
             await reporting.thermostatKeypadLockMode(endpoint);
@@ -469,14 +479,14 @@ module.exports = [
                 reportableChange: null,
             }]);
 
+            // Metering
             await endpoint.read('haElectricalMeasurement', ['acVoltageMultiplier', 'acVoltageDivisor', 'acCurrentMultiplier']);
             await endpoint.read('haElectricalMeasurement', ['acCurrentDivisor']);
-
-            await reporting.activePower(endpoint);
-            await reporting.rmsCurrent(endpoint, {min: 10, change: 10});
-            await reporting.rmsVoltage(endpoint, {min: 10});
+            await reporting.rmsVoltage(endpoint, {min: 10, change: 20}); // Voltage - Min change of 2v
+            await reporting.rmsCurrent(endpoint, {min: 10, change: 10}); // A - z2m displays only the first decimals, so change of 10 (0,01)
+            await reporting.activePower(endpoint, {min: 10, change: 15}); // W - Min change of 1,5W
+            await reporting.currentSummDelivered(endpoint, {min: 300}); // Report KWH every 5min
             await reporting.readMeteringMultiplierDivisor(endpoint);
-            await reporting.currentSummDelivered(endpoint);
 
             // Custom attributes
             const options = {manufacturerCode: 0x1224};
@@ -589,6 +599,29 @@ module.exports = [
             await endpoint.read('hvacThermostat', [0x1008, 0x1009, 0x100A, 0x100B], options);
             await endpoint.read('hvacThermostat', [0x2001, 0x2002], options);
         },
+        ota: ota.zigbeeOTA,
+    },
+    {
+        zigbeeModel: ['4512735'],
+        model: '4512735',
+        vendor: 'Namron',
+        description: 'Multiprise with 4 AC outlets and 2 USB super charging ports (16A)',
+        fromZigbee: [fz.on_off],
+        toZigbee: [tz.on_off],
+        exposes: [e.switch().withEndpoint('l1'), e.switch().withEndpoint('l2'), e.switch().withEndpoint('l3'),
+            e.switch().withEndpoint('l4'), e.switch().withEndpoint('l5')],
+        endpoint: (device) => {
+            return {'l1': 1, 'l2': 2, 'l3': 3, 'l4': 4, 'l5': 5};
+        },
+        meta: {multiEndpoint: true},
+        configure: async (device, coordinatorEndpoint, logger) => {
+            for (const ID of [1, 2, 3, 4, 5]) {
+                const endpoint = device.getEndpoint(ID);
+                await reporting.bind(endpoint, coordinatorEndpoint, ['genOnOff']);
+            }
+            device.powerSource = 'Mains (single phase)';
+            device.save();
+        },
     },
     {
         zigbeeModel: ['5401392', '5401396', '5401393', '5401397', '5401394', '5401398', '5401395', '5401399', '5401395'],
@@ -693,6 +726,35 @@ module.exports = [
             await endpoint.read('hvacThermostat', [0x1000, 0x1001, 0x1004, 0x1009, 0x100A], options);
 
             await reporting.bind(endpoint, coordinatorEndpoint, binds);
+        },
+    },
+    {
+        zigbeeModel: ['3802968'],
+        model: '3802968',
+        vendor: 'Namron',
+        description: 'LED Filament Flex 5W CCT E27 Clear',
+        extend: extend.light_onoff_brightness_colortemp({colorTempRange: [153, 555]}),
+        meta: {turnsOffAtBrightness1: true},
+    },
+    {
+        zigbeeModel: ['4512749'],
+        model: '4512749',
+        vendor: 'Namron',
+        description: 'Thermostat outlet socket',
+        fromZigbee: [fz.metering, fz.electrical_measurement, fz.on_off, fz.temperature],
+        toZigbee: [tz.on_off, tz.power_on_behavior],
+        exposes: [e.temperature(), e.power(), e.current(), e.voltage(), e.switch(), e.power_on_behavior()],
+        configure: async (device, coordinatorEndpoint, logger) => {
+            const endpoint = device.getEndpoint(1);
+            await reporting.bind(endpoint, coordinatorEndpoint, ['genOnOff', 'haElectricalMeasurement', 'msTemperatureMeasurement']);
+            await endpoint.read('haElectricalMeasurement', ['acVoltageMultiplier', 'acVoltageDivisor']);
+            await endpoint.read('haElectricalMeasurement', ['acPowerMultiplier', 'acPowerDivisor']);
+            await endpoint.read('haElectricalMeasurement', ['acCurrentMultiplier', 'acCurrentDivisor']);
+            await reporting.onOff(endpoint);
+            await reporting.temperature(endpoint);
+            await reporting.rmsVoltage(endpoint);
+            await reporting.rmsCurrent(endpoint);
+            await reporting.activePower(endpoint);
         },
     },
 ];

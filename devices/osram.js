@@ -3,7 +3,23 @@ const fz = {...require('../converters/fromZigbee'), legacy: require('../lib/lega
 const ota = require('../lib/ota');
 const reporting = require('../lib/reporting');
 const extend = require('../lib/extend');
+const utils = require('../lib/utils');
 const e = exposes.presets;
+
+const fzLocal = {
+    pbc_level_to_action: {
+        cluster: 'genLevelCtrl',
+        type: ['commandMoveWithOnOff', 'commandStopWithOnOff', 'commandMove', 'commandStop', 'commandMoveToLevelWithOnOff'],
+        convert: (model, msg, publish, options, meta) => {
+            if (utils.hasAlreadyProcessedMessage(msg, model)) return;
+            const lookup = {
+                commandMoveWithOnOff: 'hold', commandMove: 'hold', commandStopWithOnOff: 'release',
+                commandStop: 'release', commandMoveToLevelWithOnOff: 'toggle',
+            };
+            return {[utils.postfixWithEndpointName('action', msg, model, meta)]: lookup[msg.type]};
+        },
+    },
+};
 
 module.exports = [
     {
@@ -189,7 +205,7 @@ module.exports = [
         model: 'AB3257001NJ',
         description: 'Smart+ plug',
         vendor: 'OSRAM',
-        extend: extend.switch(),
+        extend: extend.switch({disablePowerOnBehavior: true}),
         whiteLabel: [{vendor: 'LEDVANCE', model: 'AB3257001NJ'}, {vendor: 'LEDVANCE', model: 'AC03360'}],
         ota: ota.ledvance,
         configure: async (device, coordinatorEndpoint, logger) => {
@@ -210,7 +226,7 @@ module.exports = [
         model: 'AC10691',
         description: 'Smart+ plug',
         vendor: 'OSRAM',
-        extend: extend.switch(),
+        extend: extend.switch({disablePowerOnBehavior: true}),
         ota: ota.ledvance,
         whiteLabel: [{vendor: 'LEDVANCE', model: 'AC10691'}],
         configure: async (device, coordinatorEndpoint, logger) => {
@@ -319,7 +335,7 @@ module.exports = [
         model: 'AC03648',
         vendor: 'OSRAM',
         description: 'SMART+ spot GU5.3 tunable white',
-        extend: extend.ledvance.light_onoff_brightness_colortemp({colorTempRange: [153, 370]}),
+        extend: extend.ledvance.light_onoff_brightness_colortemp({colorTempRange: [153, 370], disablePowerOnBehavior: true}),
         ota: ota.ledvance,
     },
     {
@@ -396,7 +412,7 @@ module.exports = [
         model: '4062172044776_1',
         vendor: 'OSRAM',
         description: 'Zigbee 3.0 DALI CONV LI dimmer for DALI-based luminaires (only one device)',
-        extend: extend.ledvance.light_onoff_brightness(),
+        extend: extend.ledvance.light_onoff_brightness({disablePowerOnBehavior: true}),
         ota: ota.zigbeeOTA,
     },
     {
@@ -409,7 +425,7 @@ module.exports = [
             fz.command_toggle, fz.command_move, fz.command_stop],
         extend: extend.ledvance.light_onoff_brightness({noConfigure: true}),
         exposes: [e.action(['toggle', 'brightness_move_up', 'brightness_move_down', 'brightness_stop']),
-            ...extend.ledvance.light_onoff_brightness({noConfigure: true}).exposes],
+            ...extend.ledvance.light_onoff_brightness({noConfigure: true, disablePowerOnBehavior: true}).exposes],
         ota: ota.zigbeeOTA,
         configure: async (device, coordinatorEndpoint, logger) => {
             await reporting.bind(device.getEndpoint(10), coordinatorEndpoint, ['genLevelCtrl', 'genOnOff']);
@@ -475,5 +491,29 @@ module.exports = [
         description: 'Lightify under cabinet tunable white',
         extend: extend.ledvance.light_onoff_brightness_colortemp({colorTempRange: [153, 370]}),
         ota: ota.ledvance,
+    },
+    {
+        zigbeeModel: ['PBC'],
+        model: '4052899930377',
+        vendor: 'OSRAM',
+        description: 'Lightify pro push button controller (PBC)',
+        meta: {multiEndpoint: true},
+        endpoint: (device) => {
+            return {'l1': 1, 'l2': 2, 'l3': 3, 'l4': 4};
+        },
+        fromZigbee: [fzLocal.pbc_level_to_action],
+        exposes: [
+            e.action(['hold', 'release', 'toggle']).withEndpoint('l1'),
+            e.action(['hold', 'release', 'toggle']).withEndpoint('l2'),
+            e.action(['hold', 'release', 'toggle']).withEndpoint('l3'),
+            e.action(['hold', 'release', 'toggle']).withEndpoint('l4'),
+        ],
+        toZigbee: [],
+        configure: async (device, coordinatorEndpoint, logger) => {
+            await reporting.bind(device.getEndpoint(1), coordinatorEndpoint, ['genLevelCtrl']);
+            await reporting.bind(device.getEndpoint(2), coordinatorEndpoint, ['genLevelCtrl']);
+            await reporting.bind(device.getEndpoint(3), coordinatorEndpoint, ['genLevelCtrl']);
+            await reporting.bind(device.getEndpoint(4), coordinatorEndpoint, ['genLevelCtrl']);
+        },
     },
 ];

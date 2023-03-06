@@ -9,10 +9,12 @@ const e = exposes.presets;
 const extendDontUse = require('../lib/extend');
 const extend = {switch: extendDontUse.switch};
 const sengledExtend = {
-    light_onoff_brightness: (options={}) => extendDontUse.light_onoff_brightness({disableEffect: true, ...options}),
-    light_onoff_brightness_colortemp: (options={}) => extendDontUse.light_onoff_brightness_colortemp({disableEffect: true, ...options}),
+    light_onoff_brightness: (options={}) => extendDontUse.light_onoff_brightness(
+        {disableEffect: true, disablePowerOnBehavior: true, ...options}),
+    light_onoff_brightness_colortemp: (options={}) => extendDontUse.light_onoff_brightness_colortemp(
+        {disableEffect: true, disablePowerOnBehavior: true, ...options}),
     light_onoff_brightness_colortemp_color: (options={}) =>
-        extendDontUse.light_onoff_brightness_colortemp_color({disableEffect: true, ...options}),
+        extendDontUse.light_onoff_brightness_colortemp_color({disableEffect: true, disablePowerOnBehavior: true, ...options}),
 };
 
 module.exports = [
@@ -144,8 +146,18 @@ module.exports = [
         model: 'Z01-A19NAE26',
         vendor: 'Sengled',
         description: 'Element plus (A19)',
-        extend: sengledExtend.light_onoff_brightness_colortemp(),
+        fromZigbee: sengledExtend.light_onoff_brightness_colortemp_color().fromZigbee.concat([fz.metering]),
+        toZigbee: sengledExtend.light_onoff_brightness_colortemp_color().toZigbee,
         ota: ota.zigbeeOTA,
+        configure: async (device, coordinatorEndpoint, logger) => {
+            await sengledExtend.light_onoff_brightness_colortemp_color().configure(device, coordinatorEndpoint, logger);
+            const endpoint = device.getEndpoint(1);
+            await reporting.bind(endpoint, coordinatorEndpoint, ['seMetering']);
+            await reporting.readMeteringMultiplierDivisor(endpoint);
+            await reporting.currentSummDelivered(endpoint);
+            await reporting.instantaneousDemand(endpoint);
+        },
+        exposes: sengledExtend.light_onoff_brightness_colortemp_color().exposes.concat([e.power(), e.energy()]),
     },
     {
         zigbeeModel: ['Z01-A60EAE27'],

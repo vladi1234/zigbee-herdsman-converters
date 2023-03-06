@@ -101,11 +101,25 @@ module.exports = [
         extend: extend.light_onoff_brightness_colortemp(),
     },
     {
+        zigbeeModel: ['TWMPROZXBulb50AU'],
+        model: 'AU-A1ZBMPRO1ZX',
+        vendor: 'Aurora Lighting',
+        description: 'AOne MPROZX fixed IP65 fire rated smart tuneable LED downlight',
+        extend: extend.light_onoff_brightness_colortemp({colorTempRange: [200, 455]}),
+    },
+    {
         zigbeeModel: ['FWG125Bulb50AU'],
         model: 'AU-A1VG125Z5E/19',
         vendor: 'Aurora Lighting',
         description: 'AOne 4W smart dimmable G125 lamp 1900K',
         meta: {turnsOffAtBrightness1: true},
+        extend: extend.light_onoff_brightness(),
+    },
+    {
+        zigbeeModel: ['FWBulb51AU'],
+        model: 'AU-A1GSZ9B/27',
+        vendor: 'Aurora Lighting',
+        description: 'AOne 9W smart GLS B22',
         extend: extend.light_onoff_brightness(),
     },
     {

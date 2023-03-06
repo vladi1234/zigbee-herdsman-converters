@@ -4,10 +4,24 @@ const tz = require('../converters/toZigbee');
 const reporting = require('../lib/reporting');
 const extend = require('../lib/extend');
 const e = exposes.presets;
-const ea = exposes.access;
 const ota = require('../lib/ota');
 
 module.exports = [
+    {
+        zigbeeModel: ['RC 210'],
+        model: 'RC 210',
+        vendor: 'Innr',
+        description: 'Remote control',
+        fromZigbee: [fz.command_on, fz.command_off, fz.command_move, fz.command_stop, fz.command_move_to_level,
+            fz.command_move_to_color_temp],
+        toZigbee: [],
+        exposes: [e.action(['on', 'off', 'brightness_move_up', 'brightness_move_down', 'brightness_stop', 'brightness_move_to_level',
+            'color_temperature_move'])],
+        configure: async (device, coordinatorEndpoint, logger) => {
+            const ep = device.getEndpoint(1);
+            await reporting.bind(ep, coordinatorEndpoint, ['genBasic', 'genOnOff', 'genLevelCtrl', 'lightingColorCtrl']);
+        },
+    },
     {
         zigbeeModel: ['RC 250'],
         model: 'RC 250',
@@ -528,7 +542,7 @@ module.exports = [
             endpoint.saveClusterAttributeKeyValue('seMetering', {multiplier: 1, divisor: 100});
             await reporting.currentSummDelivered(endpoint);
         },
-        exposes: [e.power(), e.current(), e.voltage().withAccess(ea.STATE), e.switch(), e.energy()],
+        exposes: [e.power(), e.current(), e.voltage(), e.switch(), e.energy()],
     },
     {
         zigbeeModel: ['SP 110'],
@@ -603,7 +617,7 @@ module.exports = [
             await reporting.currentSummDelivered(endpoint);
         },
         ota: ota.zigbeeOTA,
-        exposes: [e.power(), e.current(), e.voltage().withAccess(ea.STATE), e.switch(), e.energy()],
+        exposes: [e.power(), e.current(), e.voltage(), e.switch(), e.energy()],
     },
     {
         zigbeeModel: ['OFL 120 C'],

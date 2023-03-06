@@ -36,6 +36,13 @@ module.exports = [
         ota: ota.ledvance,
     },
     {
+        zigbeeModel: ['Panel Light 2x2 TW'],
+        model: '74746',
+        vendor: 'LEDVANCE',
+        description: 'LEDVANCE 74746 Sylvania smart+ Zigbee dimmable edge-lit panel',
+        extend: extend.ledvance.light_onoff_brightness_colortemp_color({colorTempRange: [200, 370]}),
+    },
+    {
         zigbeeModel: ['Panel TW 620 UGR19'],
         model: 'GPDRPLOP401100CE',
         vendor: 'LEDVANCE',
@@ -48,7 +55,7 @@ module.exports = [
         model: 'AC25697',
         vendor: 'LEDVANCE',
         description: 'SMART+ CLASSIC MULTICOLOUR 60 10W E27',
-        extend: extend.ledvance.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500]}),
+        extend: extend.ledvance.light_onoff_brightness_colortemp_color({colorTempRange: [153, 500], disablePowerOnBehavior: true}),
         ota: ota.ledvance,
     },
     {
@@ -249,6 +256,22 @@ module.exports = [
         vendor: 'LEDVANCE',
         description: 'SMART+ Filament Edison 52 E27 Amber dimmable',
         extend: extend.ledvance.light_onoff_brightness(),
+        ota: ota.ledvance,
+    },
+    {
+        zigbeeModel: ['FLEX RGBW T'],
+        model: '4058075729384',
+        vendor: 'LEDVANCE',
+        description: 'SMART+ Indoor Flex multicolor RGBW',
+        extend: extend.ledvance.light_onoff_brightness_colortemp_color({colorTempRange: [153, 526]}),
+        ota: ota.ledvance,
+    },
+    {
+        zigbeeModel: ['OUTDOOR FLEX RGBW T'],
+        model: '4058075729360',
+        vendor: 'LEDVANCE',
+        description: 'SMART+ Outdoor Flex multicolor RGBW',
+        extend: extend.ledvance.light_onoff_brightness_colortemp_color({colorTempRange: [153, 526]}),
         ota: ota.ledvance,
     },
     {

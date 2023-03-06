@@ -103,7 +103,7 @@ module.exports = [
         model: 'LXZB-02A',
         vendor: 'Nue / 3A',
         description: 'Smart light controller',
-        extend: extend.light_onoff_brightness(),
+        extend: extend.light_onoff_brightness({disablePowerOnBehavior: true}),
     },
     {
         zigbeeModel: ['FNB56-ZSW03LX2.0', 'LXN-3S27LX1.0'],
@@ -257,7 +257,7 @@ module.exports = [
         model: 'HGZB-02A',
         vendor: 'Nue / 3A',
         description: 'Smart light controller',
-        extend: extend.light_onoff_brightness(),
+        extend: extend.light_onoff_brightness({disablePowerOnBehavior: true}),
     },
     {
         zigbeeModel: ['FNB56-ZSW01LX2.0'],
@@ -368,6 +368,31 @@ module.exports = [
         meta: {multiEndpoint: true},
         endpoint: (device) => {
             return {left: 1, right: 2};
+        },
+    },
+    {
+        zigbeeModel: ['LXN56-1S27LX1.2', 'LXX60-FN27LX1.0'],
+        model: 'NUE-ZBFLB',
+        vendor: 'Nue / 3A',
+        description: 'Smart fan light switch',
+        extend: extend.switch(),
+        exposes: [
+            e.switch().withEndpoint('button_light'),
+            e.switch().withEndpoint('button_fan_high'),
+            e.switch().withEndpoint('button_fan_med'),
+            e.switch().withEndpoint('button_fan_low'),
+        ],
+        endpoint: (device) => {
+            return {'button_light': 1, 'button_fan_high': 2, 'button_fan_med': 3, 'button_fan_low': 4};
+        },
+        meta: {multiEndpoint: true},
+        configure: async (device, coordinatorEndpoint, logger) => {
+            await reporting.bind(device.getEndpoint(1), coordinatorEndpoint, ['genOnOff']);
+            await reporting.bind(device.getEndpoint(2), coordinatorEndpoint, ['genOnOff']);
+            await reporting.bind(device.getEndpoint(3), coordinatorEndpoint, ['genOnOff']);
+            await reporting.bind(device.getEndpoint(4), coordinatorEndpoint, ['genOnOff']);
+            device.powerSource = 'Mains (single phase)';
+            device.save();
         },
     },
 ];

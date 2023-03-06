@@ -135,22 +135,28 @@ const develco = {
             type: ['attributeReport', 'readResponse'],
             options: [exposes.options.precision('voc'), exposes.options.calibration('voc')],
             convert: (model, msg, publish, options, meta) => {
-                const voc = parseFloat(msg.data['measuredValue']);
+                // from Sensirion_Gas_Sensors_SGP3x_TVOC_Concept.pdf
+                // "The mean molar mass of this mixture is 110 g/mol and hence,
+                // 1 ppb TVOC corresponds to 4.5 μg/m3."
+                const vocPpb = parseFloat(msg.data['measuredValue']);
+                const voc = vocPpb * 4.5;
                 const vocProperty = utils.postfixWithEndpointName('voc', msg, model, meta);
 
+                // from aqszb-110-technical-manual-air-quality-sensor-04-08-20.pdf page 6, section 2.2 voc
+                // this contains a ppb to level mapping table.
                 let airQuality;
                 const airQualityProperty = utils.postfixWithEndpointName('air_quality', msg, model, meta);
-                if (voc <= 65) {
+                if (vocPpb <= 65) {
                     airQuality = 'excellent';
-                } else if (voc <= 220) {
+                } else if (vocPpb <= 220) {
                     airQuality = 'good';
-                } else if (voc <= 660) {
+                } else if (vocPpb <= 660) {
                     airQuality = 'moderate';
-                } else if (voc <= 2200) {
+                } else if (vocPpb <= 2200) {
                     airQuality = 'poor';
-                } else if (voc <= 5500) {
+                } else if (vocPpb <= 5500) {
                     airQuality = 'unhealthy';
-                } else if (voc > 5500) {
+                } else if (vocPpb > 5500) {
                     airQuality = 'out_of_range';
                 } else {
                     airQuality = 'unknown';
@@ -519,6 +525,42 @@ module.exports = [
         exposes: [e.contact(), e.battery_low()],
     },
     {
+        zigbeeModel: ['WISZB-137'],
+        model: 'WISZB-137',
+        vendor: 'Develco',
+        description: 'Vibration sensor',
+        fromZigbee: [fz.battery, fz.ias_vibration_alarm_1, fz.temperature],
+        toZigbee: [],
+        meta: {battery: {voltageToPercentage: '3V_2100'}},
+        exposes: [e.battery_low(), e.battery(), e.temperature(), e.vibration(), e.tamper()],
+        configure: async (device, coordinatorEndpoint) => {
+            const endpoint38 = device.getEndpoint(38);
+            await reporting.bind(endpoint38, coordinatorEndpoint, ['msTemperatureMeasurement', 'genPowerCfg']);
+            await reporting.temperature(endpoint38);
+            await reporting.batteryVoltage(endpoint38);
+        },
+    },
+    {
+        zigbeeModel: ['WISZB-138'],
+        model: 'WISZB-138',
+        vendor: 'Develco',
+        description: 'Window sensor',
+        fromZigbee: [fz.ias_contact_alarm_1, fz.battery, develco.fz.temperature],
+        toZigbee: [],
+        exposes: [e.contact(), e.battery(), e.battery_low(), e.temperature()],
+        meta: {battery: {voltageToPercentage: '3V_2500'}},
+        configure: async (device, coordinatorEndpoint, logger) => {
+            const endpoint35 = device.getEndpoint(35);
+            const endpoint38 = device.getEndpoint(38);
+            await reporting.bind(endpoint35, coordinatorEndpoint, ['genPowerCfg']);
+            await reporting.bind(endpoint38, coordinatorEndpoint, ['msTemperatureMeasurement']);
+            await reporting.batteryVoltage(endpoint35);
+            await reporting.temperature(endpoint38);
+
+            await develco.configure.read_sw_hw_version(device, logger);
+        },
+    },
+    {
         zigbeeModel: ['MOSZB-130'],
         model: 'MOSZB-130',
         vendor: 'Develco',
@@ -556,6 +598,7 @@ module.exports = [
             dynExposes.push(e.linkquality());
             return dynExposes;
         },
+        ota: ota.zigbeeOTA,
         meta: {battery: {voltageToPercentage: '3V_2500'}},
         endpoint: (device) => {
             return {default: 35};

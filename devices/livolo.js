@@ -65,8 +65,8 @@ module.exports = [
         model: 'TI0001-switch',
         description: 'Zigbee switch 1 gang',
         vendor: 'Livolo',
-        fromZigbee: [fz.livolo_new_switch_state],
-        toZigbee: [tz.livolo_socket_switch_on_off],
+        fromZigbee: [fz.livolo_new_switch_state, fz.power_on_behavior],
+        toZigbee: [tz.livolo_socket_switch_on_off, tz.power_on_behavior],
         extend: extend.switch(),
         configure: poll,
         endpoint: (device) => {
@@ -151,8 +151,8 @@ module.exports = [
         description: 'Zigbee socket',
         vendor: 'Livolo',
         extend: extend.switch(),
-        fromZigbee: [fz.livolo_socket_state],
-        toZigbee: [tz.livolo_socket_switch_on_off],
+        fromZigbee: [fz.livolo_socket_state, fz.power_on_behavior],
+        toZigbee: [tz.livolo_socket_switch_on_off, tz.power_on_behavior],
         configure: poll,
         onEvent: async (type, data, device) => {
             if (type === 'stop') {
@@ -205,7 +205,7 @@ module.exports = [
         toZigbee: [tz.livolo_cover_state, tz.livolo_cover_position, tz.livolo_cover_options],
         exposes: [
             e.cover_position().setAccess('position', ea.STATE_SET),
-            exposes.composite('options', 'options')
+            exposes.composite('options', 'options', ea.STATE_SET)
                 .withDescription('Motor options')
                 .withFeature(exposes.numeric('motor_speed', ea.STATE_SET)
                     .withValueMin(20)
@@ -240,6 +240,43 @@ module.exports = [
                         const options = {manufacturerCode: 0x1ad2, disableDefaultResponse: true, disableResponse: true,
                             reservedBits: 3, direction: 1, writeUndiv: true};
                         const payload = {0x0802: {value: [data.data[3], 0, 0, 0, 0, 0, 0], type: data.data[2]}};
+                        await endpoint.readResponse('genPowerCfg', 0xe9, payload, options);
+                    }
+                }
+            }
+        },
+    },
+    {
+        zigbeeModel: ['TI0001-pir'],
+        model: 'TI0001-pir',
+        description: 'Zigbee motion Sensor',
+        vendor: 'Livolo',
+        exposes: [
+            e.occupancy(),
+        ],
+        fromZigbee: [fz.livolo_pir_state],
+        toZigbee: [],
+        configure: poll,
+        onEvent: async (type, data, device) => {
+            if (type === 'stop') {
+                clearInterval(globalStore.getValue(device, 'interval'));
+                globalStore.clearValue(device, 'interval');
+            }
+            if (['start', 'deviceAnnounce'].includes(type)) {
+                await poll(device);
+                if (!globalStore.hasValue(device, 'interval')) {
+                    const interval = setInterval(async () => await poll(device), 10*1000);
+                    globalStore.putValue(device, 'interval', interval);
+                }
+            }
+            if (data.cluster === 'genPowerCfg' && data.type === 'raw') {
+                const dp = data.data[10];
+                if (data.data[0] === 0x7a && data.data[1] === 0xd1) {
+                    const endpoint = device.getEndpoint(6);
+                    if (dp === 0x01) {
+                        const options = {manufacturerCode: 0x1ad2, disableDefaultResponse: true, disableResponse: true,
+                            reservedBits: 3, direction: 1, writeUndiv: true};
+                        const payload = {0x2002: {value: [0, 0, 0, 0, 0, 0, 0], type: 0x0e}};
                         await endpoint.readResponse('genPowerCfg', 0xe9, payload, options);
                     }
                 }

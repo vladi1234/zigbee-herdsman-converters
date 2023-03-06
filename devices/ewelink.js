@@ -4,12 +4,39 @@ const reporting = require('../lib/reporting');
 const extend = require('../lib/extend');
 const e = exposes.presets;
 
+const fzLocal = {
+    WS01_rain: {
+        cluster: 'ssIasZone',
+        type: 'commandStatusChangeNotification',
+        convert: (model, msg, publish, options, meta) => {
+            const zoneStatus = msg.data.zonestatus;
+            if (msg.endpoint.ID != 1) return;
+            return {rain: (zoneStatus & 1) > 0};
+        },
+    },
+};
+
 module.exports = [
     {
         zigbeeModel: ['SA-003-Zigbee'],
         model: 'SA-003-Zigbee',
         vendor: 'eWeLink',
         description: 'Zigbee smart plug',
+        extend: extend.switch({disablePowerOnBehavior: true}),
+        fromZigbee: [fz.on_off_skip_duplicate_transaction],
+        configure: async (device, coordinatorEndpoint, logger) => {
+            const endpoint = device.getEndpoint(1);
+            await reporting.bind(endpoint, coordinatorEndpoint, ['genOnOff']);
+        },
+        onEvent: async (type, data, device) => {
+            device.skipDefaultResponse = true;
+        },
+    },
+    {
+        zigbeeModel: ['SA-030-1'],
+        model: 'SA-030-1',
+        vendor: 'eWeLink',
+        description: 'Zigbee 3.0 smart plug 13A (3120W)(UK version)',
         extend: extend.switch(),
         fromZigbee: [fz.on_off_skip_duplicate_transaction],
         configure: async (device, coordinatorEndpoint, logger) => {
@@ -144,5 +171,14 @@ module.exports = [
         onEvent: async (type, data, device) => {
             device.skipDefaultResponse = true;
         },
+    },
+    {
+        zigbeeModel: ['WS01'],
+        model: 'WS01',
+        vendor: 'eWeLink',
+        description: 'Rainfall sensor',
+        fromZigbee: [fzLocal.WS01_rain],
+        toZigbee: [],
+        exposes: [e.rain()],
     },
 ];
