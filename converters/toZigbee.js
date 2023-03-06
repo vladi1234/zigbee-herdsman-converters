@@ -2263,7 +2263,7 @@ const converters = {
     },
     xiaomi_power: {
         key: ['power'],
-        convertSet: async (entity, key, meta) => {
+        convertGet: async (entity, key, meta) => {
             const endpoint = meta.device.endpoints.find((e) => e.supportsInputCluster('genAnalogInput'));
             await endpoint.read('genAnalogInput', ['presentValue']);
         },
