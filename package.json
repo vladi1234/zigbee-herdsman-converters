@@ -1,14 +1,18 @@
 {
   "name": "zigbee-herdsman-converters",
-  "version": "15.0.65",
+  "version": "16.12.0",
   "description": "Collection of device converters to be used with zigbee-herdsman",
   "main": "index.js",
+  "types": "index.d.ts",
   "files": [
     "/index.js",
+    "/index.js.map",
+    "/index.d.ts",
+    "/index.d.ts.map",
     "/converters",
-    "/devices.js",
+    "/lib",
     "/devices",
-    "/lib"
+    "CHANGELOG.md"
   ],
   "repository": {
     "type": "git",
@@ -25,7 +29,11 @@
   "scripts": {
     "lint": "eslint .",
     "test": "ZHC_TEST=true jest test",
-    "test-watch": "ZHC_TEST=true jest test --watch"
+    "test-watch": "ZHC_TEST=true jest test --watch",
+    "clean": "rimraf index* devices lib converters tsconfig.tsbuildinfo",
+    "build": "tsc",
+    "build-watch": "tsc --watch",
+    "prepack": "npm run clean && npm run build"
   },
   "author": "Koen Kanters",
   "license": "MIT",
@@ -34,17 +42,27 @@
   },
   "homepage": "https://github.com/Koenkk/zigbee-herdsman-converters",
   "dependencies": {
-    "axios": "^1.3.4",
+    "axios": "^1.6.2",
     "buffer-crc32": "^0.2.13",
-    "https-proxy-agent": "^5.0.1",
-    "tar-stream": "^3.0.0",
-    "zigbee-herdsman": "^0.14.97"
+    "https-proxy-agent": "^7.0.2",
+    "tar-stream": "^3.1.6",
+    "zigbee-herdsman": "^0.27.0"
   },
   "devDependencies": {
-    "eslint": "*",
-    "eslint-config-google": "*",
-    "eslint-plugin-jest": "*",
+    "@types/buffer-crc32": "^0.2.4",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.4",
+    "@types/tar-stream": "^3.1.3",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "eslint": "^8.56.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-jest": "^27.6.0",
     "fast-deep-equal": "*",
-    "jest": "*"
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.5",
+    "ts-jest": "^29.1.1",
+    "ts-morph": "^21.0.1",
+    "typescript": "^5.3.3"
   }
 }
