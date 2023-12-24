@@ -1,21 +1,13 @@
 import tz from '../converters/toZigbee';
 import fz from '../converters/fromZigbee';
-import {Fz, Tz, ModernExtend, Range, Zh, Logger, DefinitionOta} from './types';
+import {Fz, Tz, ModernExtend, Range, Zh, Logger, DefinitionOta, OnEvent} from './types';
 import {presets as e, access as ea} from './exposes';
 import {KeyValue, Configure, Expose, DefinitionMeta} from './types';
 import {configure as lightConfigure} from './light';
-import {ConfigureReportingItem as ZHConfigureReportingItem} from 'zigbee-herdsman/dist/controller/model/endpoint';
 import {
     getFromLookupByValue, isString, isNumber, isObject, isEndpoint,
     getFromLookup, getEndpointName, assertNumber, postfixWithEndpointName,
 } from './utils';
-import {repInterval} from './constants';
-
-const DefaultReportingItemValues = {
-    minimumReportInterval: 0,
-    maximumReportInterval: repInterval.MAX,
-    reportableChange: 1,
-};
 
 function getEndpointsWithInputCluster(device: Zh.Device, cluster: string | number) {
     if (!device.endpoints) {
@@ -28,36 +20,66 @@ function getEndpointsWithInputCluster(device: Zh.Device, cluster: string | numbe
     return endpoints;
 }
 
-type ConfigureReportingItem = Partial<ZHConfigureReportingItem> & {attribute: string | number | {ID: number, type: number}}
+const reportingConfigTimeLookup = {
+    '1_HOUR': 3600,
+    'MAX': 65000,
+    '30_MINUTES': 1800,
+    '10_SECONDS': 10,
+};
+
+type ReportingConfigTime = number | keyof typeof reportingConfigTimeLookup;
+type ReportingConfigAttribute = string | number | {ID: number, type: number};
+type ReportingConfig = {min: ReportingConfigTime, max: ReportingConfigTime, change: number | [number, number], attribute: ReportingConfigAttribute}
+type ReportingConfigWithoutAttribute = Omit<ReportingConfig, 'attribute'>;
+
+function convertReportingConfigTime(time: ReportingConfigTime): number {
+    if (isString(time)) {
+        if (!(time in reportingConfigTimeLookup)) throw new Error(`Reporting time '${time}' is unknown`);
+        return reportingConfigTimeLookup[time];
+    } else {
+        return time;
+    }
+}
 
 async function setupAttributes(
-    entity: Zh.Device | Zh.Endpoint, coordinatorEndpoint: Zh.Endpoint, cluster: string | number, attributes: ConfigureReportingItem[], logger: Logger,
+    entity: Zh.Device | Zh.Endpoint, coordinatorEndpoint: Zh.Endpoint, cluster: string | number, config: ReportingConfig[], logger: Logger,
     readOnly=false,
 ) {
     const endpoints = isEndpoint(entity) ? [entity] : getEndpointsWithInputCluster(entity, cluster);
     const ieeeAddr = isEndpoint(entity) ? entity.deviceIeeeAddress : entity.ieeeAddr;
     for (const endpoint of endpoints) {
         const msg = readOnly ? `Reading` : `Reading and setup reporting`;
-        logger.debug(`${msg} for ${ieeeAddr}/${endpoint.ID} ${cluster} ${JSON.stringify(attributes)}`);
+        logger.debug(`${msg} for ${ieeeAddr}/${endpoint.ID} ${cluster} ${JSON.stringify(config)}`);
         if (!readOnly) {
             await endpoint.bind(cluster, coordinatorEndpoint);
-            await endpoint.configureReporting(cluster, attributes.map((a) => ({...DefaultReportingItemValues, ...a})));
+            await endpoint.configureReporting(cluster, config.map((a) => ({
+                minimumReportInterval: convertReportingConfigTime(a.min),
+                maximumReportInterval: convertReportingConfigTime(a.max),
+                reportableChange: a.change,
+                attribute: a.attribute,
+            })));
         }
-        await endpoint.read(cluster, attributes.map((a) => isString(a) ? a : (isObject(a.attribute) ? a.attribute.ID : a.attribute)));
+        await endpoint.read(cluster, config.map((a) => isString(a) ? a : (isObject(a.attribute) ? a.attribute.ID : a.attribute)));
     }
 }
 
 export function setupConfigureForReporting(
-    cluster: string | number, attribute: string | number | {ID: number, type: number},
-    endpointID?: number, reportingConfiguration?: Partial<ZHConfigureReportingItem>,
+    cluster: string | number, attribute: ReportingConfigAttribute, endpointID?: number, config?: ReportingConfigWithoutAttribute,
 ) {
     const configure: Configure = async (device, coordinatorEndpoint, logger) => {
         const entity = isNumber(endpointID) ? device.getEndpoint(endpointID) : device;
-        const reportConfig = (reportingConfiguration !== undefined) ? {...reportingConfiguration, ...{attribute: attribute}} : {attribute: attribute};
-        await setupAttributes(entity, coordinatorEndpoint, cluster, [reportConfig], logger, (reportingConfiguration === undefined));
+        const reportConfig = config ? {...config, attribute: attribute} : {attribute, min: -1, max: -1, change: -1};
+        await setupAttributes(entity, coordinatorEndpoint, cluster, [reportConfig], logger, !config);
     };
 
     return configure;
+}
+
+export function identify(): ModernExtend {
+    return {
+        toZigbee: [tz.identify],
+        isModernExtend: true,
+    };
 }
 
 export interface OnOffArgs {
@@ -86,9 +108,10 @@ export function onOff(args?: OnOffArgs): ModernExtend {
     }
     if (args.configureReporting) {
         result.configure = async (device, coordinatorEndpoint, logger) => {
-            await setupAttributes(device, coordinatorEndpoint, 'genOnOff', [{attribute: 'onOff'}], logger);
+            await setupAttributes(device, coordinatorEndpoint, 'genOnOff', [{attribute: 'onOff', min: 0, max: 'MAX', change: 1}], logger);
             if (args.powerOnBehavior) {
-                await setupAttributes(device, coordinatorEndpoint, 'genOnOff', [{attribute: 'startUpOnOff'}], logger, true);
+                await setupAttributes(device, coordinatorEndpoint, 'genOnOff',
+                    [{attribute: 'startUpOnOff', min: 0, max: 'MAX', change: 1}], logger, true);
             }
         };
     }
@@ -162,7 +185,7 @@ export function electricityMeter(args?: ElectricityMeterArgs): ModernExtend {
     const configure: Configure = async (device, coordinatorEndpoint, logger) => {
         for (const [cluster, properties] of Object.entries(configureLookup)) {
             for (const endpoint of getEndpointsWithInputCluster(device, cluster)) {
-                const items: ConfigureReportingItem[] = [];
+                const items: ReportingConfig[] = [];
                 for (const property of Object.values(properties)) {
                     // In case multiplier or divisor was provided, use that instead of reading from device.
                     if (property.forced) {
@@ -179,17 +202,14 @@ export function electricityMeter(args?: ElectricityMeterArgs): ModernExtend {
                     assertNumber(divisor, property.divisor);
                     const multiplier = endpoint.getClusterAttributeValue(cluster, property.multiplier);
                     assertNumber(multiplier, property.multiplier);
-                    let reportableChange: number | [number, number] = property.change * (divisor / multiplier);
+                    let change: number | [number, number] = property.change * (divisor / multiplier);
                     // currentSummDelivered data type is uint48, so reportableChange also is uint48
-                    if (property.attribute === 'currentSummDelivered') reportableChange = [0, reportableChange];
-                    items.push({
-                        attribute: property.attribute,
-                        minimumReportInterval: repInterval.SECONDS_10,
-                        maximumReportInterval: repInterval.MAX,
-                        reportableChange,
-                    });
+                    if (property.attribute === 'currentSummDelivered') change = [0, change];
+                    items.push({attribute: property.attribute, min: '10_SECONDS', max: 'MAX', change});
                 }
-                await setupAttributes(endpoint, coordinatorEndpoint, cluster, items, logger);
+                if (items.length) {
+                    await setupAttributes(endpoint, coordinatorEndpoint, cluster, items, logger);
+                }
             }
         }
     };
@@ -221,7 +241,10 @@ export function light(args?: LightArgs): ModernExtend {
 
     if (args.colorTemp || argsColor) {
         fromZigbee.push(fz.color_colortemp);
-        toZigbee.push(tz.light_color_colortemp, tz.light_color_mode, tz.light_color_options);
+        if (args.colorTemp && argsColor) toZigbee.push(tz.light_color_colortemp);
+        else if (args.colorTemp) toZigbee.push(tz.light_colortemp);
+        else if (argsColor) toZigbee.push(tz.light_color);
+        toZigbee.push(tz.light_color_mode, tz.light_color_options);
     }
 
     if (args.colorTemp) {
@@ -272,24 +295,25 @@ export function light(args?: LightArgs): ModernExtend {
         await lightConfigure(device, coordinatorEndpoint, logger, true);
 
         if (args.configureReporting) {
-            await setupAttributes(device, coordinatorEndpoint, 'genOnOff', [{attribute: 'onOff'}], logger);
-            await setupAttributes(device, coordinatorEndpoint, 'genLevelCtrl', [{attribute: 'currentLevel', minimumReportInterval: 10}], logger);
+            await setupAttributes(device, coordinatorEndpoint, 'genOnOff', [{attribute: 'onOff', min: 0, max: 'MAX', change: 1}], logger);
+            await setupAttributes(device, coordinatorEndpoint, 'genLevelCtrl',
+                [{attribute: 'currentLevel', min: '10_SECONDS', max: 'MAX', change: 1}], logger);
             if (args.colorTemp) {
                 await setupAttributes(device, coordinatorEndpoint, 'lightingColorCtrl',
-                    [{attribute: 'colorTemperature', minimumReportInterval: 10}], logger);
+                    [{attribute: 'colorTemperature', min: '10_SECONDS', max: 'MAX', change: 1}], logger);
             }
             if (argsColor) {
-                const attributes: ConfigureReportingItem[] = [];
+                const attributes: ReportingConfig[] = [];
                 if (argsColor.modes.includes('xy')) {
                     attributes.push(
-                        {attribute: 'currentX', minimumReportInterval: 10},
-                        {attribute: 'currentY', minimumReportInterval: 10},
+                        {attribute: 'currentX', min: '10_SECONDS', max: 'MAX', change: 1},
+                        {attribute: 'currentY', min: '10_SECONDS', max: 'MAX', change: 1},
                     );
                 }
                 if (argsColor.modes.includes('hs')) {
                     attributes.push(
-                        {attribute: argsColor.enhancedHue ? 'enhancedCurrentHue' : 'currentHue', minimumReportInterval: 10},
-                        {attribute: 'currentSaturation', minimumReportInterval: 10},
+                        {attribute: argsColor.enhancedHue ? 'enhancedCurrentHue' : 'currentHue', min: '10_SECONDS', max: 'MAX', change: 1},
+                        {attribute: 'currentSaturation', min: '10_SECONDS', max: 'MAX', change: 1},
                     );
                 }
                 await setupAttributes(device, coordinatorEndpoint, 'lightingColorCtrl', attributes, logger);
@@ -306,13 +330,13 @@ export function light(args?: LightArgs): ModernExtend {
 export interface EnumLookupArgs {
     name: string, lookup: KeyValue, cluster: string | number, attribute: string | {ID: number, type: number}, description: string,
     zigbeeCommandOptions?: {manufacturerCode?: number, disableDefaultResponse?: boolean}, readOnly?: boolean, endpoint?: string,
-    endpointID?: number, configureReporting?: Partial<ZHConfigureReportingItem>,
+    endpointID?: number, reporting?: ReportingConfigWithoutAttribute,
 }
 export function enumLookup(args: EnumLookupArgs): ModernExtend {
     const {
         name, lookup, cluster, attribute, description,
         zigbeeCommandOptions, readOnly, endpoint,
-        endpointID, configureReporting,
+        endpointID, reporting,
     } = args;
     const attributeKey = isString(attribute) ? attribute : attribute.ID;
 
@@ -342,7 +366,7 @@ export function enumLookup(args: EnumLookupArgs): ModernExtend {
         },
     }];
 
-    const configure = setupConfigureForReporting(cluster, attribute, endpointID, configureReporting);
+    const configure = setupConfigureForReporting(cluster, attribute, endpointID, reporting);
 
     return {exposes: [expose], fromZigbee, toZigbee, configure, isModernExtend: true};
 }
@@ -350,14 +374,14 @@ export function enumLookup(args: EnumLookupArgs): ModernExtend {
 export interface NumericArgs {
     name: string, cluster: string | number, attribute: string | {ID: number, type: number}, description: string,
     zigbeeCommandOptions?: {manufacturerCode?: number, disableDefaultResponse?: boolean}, readOnly?: boolean, unit?: string,
-    endpoint?: string, endpointID?: number, configureReporting?: Partial<ZHConfigureReportingItem>,
+    endpoint?: string, endpointID?: number, reporting?: ReportingConfigWithoutAttribute,
     valueMin?: number, valueMax?: number, valueStep?: number, scale?: number,
 }
 export function numeric(args: NumericArgs): ModernExtend {
     const {
         name, cluster, attribute, description,
         zigbeeCommandOptions, readOnly, unit, endpoint,
-        endpointID, configureReporting,
+        endpointID, reporting,
         valueMin, valueMax, valueStep, scale,
     } = args;
     const attributeKey = isString(attribute) ? attribute : attribute.ID;
@@ -396,7 +420,7 @@ export function numeric(args: NumericArgs): ModernExtend {
         },
     }];
 
-    const configure = setupConfigureForReporting(cluster, attribute, endpointID, configureReporting);
+    const configure = setupConfigureForReporting(cluster, attribute, endpointID, reporting);
 
     return {exposes: [expose], fromZigbee, toZigbee, configure, isModernExtend: true};
 }
@@ -404,12 +428,12 @@ export function numeric(args: NumericArgs): ModernExtend {
 export interface BinaryArgs {
     name: string, valueOn: [string | boolean, unknown], valueOff: [string | boolean, unknown], cluster: string | number,
     attribute: string | {ID: number, type: number}, description: string, zigbeeCommandOptions?: {manufacturerCode: number},
-    endpoint?: string, endpointID?: number, configureReporting?: Partial<ZHConfigureReportingItem>, readOnly?: boolean,
+    endpoint?: string, endpointID?: number, reporting?: ReportingConfig, readOnly?: boolean,
 }
 export function binary(args: BinaryArgs): ModernExtend {
     const {
         name, valueOn, valueOff, cluster, attribute, description, zigbeeCommandOptions,
-        endpoint, endpointID, configureReporting, readOnly,
+        endpoint, endpointID, reporting, readOnly,
     } = args;
     const attributeKey = isString(attribute) ? attribute : attribute.ID;
 
@@ -439,7 +463,7 @@ export function binary(args: BinaryArgs): ModernExtend {
         },
     }];
 
-    const configure = setupConfigureForReporting(cluster, attribute, endpointID, configureReporting);
+    const configure = setupConfigureForReporting(cluster, attribute, endpointID, reporting);
 
     return {exposes: [expose], fromZigbee, toZigbee, configure, isModernExtend: true};
 }
@@ -476,10 +500,71 @@ export function forcePowerSource(args: {powerSource: 'Mains (single phase)' | 'B
     return {configure, isModernExtend: true};
 }
 
+export function reconfigureReportingsOnDeviceAnnounce(): ModernExtend {
+    const onEvent: OnEvent = async (type, data, device, options, state: KeyValue) => {
+        if (type === 'deviceAnnounce') {
+            for (const endpoint of device.endpoints) {
+                for (const c of endpoint.configuredReportings) {
+                    await endpoint.configureReporting(c.cluster.name, [{
+                        attribute: c.attribute.name, minimumReportInterval: c.minimumReportInterval,
+                        maximumReportInterval: c.maximumReportInterval, reportableChange: c.reportableChange,
+                    }]);
+                }
+            }
+        }
+    };
+
+    return {onEvent, isModernExtend: true};
+}
+
 export function forceDeviceType(args: {type: 'EndDevice' | 'Router'}): ModernExtend {
     const configure: Configure = async (device, coordinatorEndpoint, logger) => {
         device.type = args.type;
         device.save();
     };
     return {configure, isModernExtend: true};
+}
+
+export function temperature(args?: Partial<NumericArgs>) {
+    return numeric({
+        name: 'temperature',
+        cluster: 'msTemperatureMeasurement',
+        attribute: 'measuredValue',
+        reporting: {min: '10_SECONDS', max: '1_HOUR', change: 100},
+        description: 'Measured temperature value',
+        unit: 'ºC',
+        scale: 100,
+        readOnly: true,
+        ...args,
+    });
+}
+
+export function humidity(args?: Partial<NumericArgs>) {
+    return numeric({
+        name: 'humidity',
+        cluster: 'msRelativeHumidity',
+        attribute: 'measuredValue',
+        reporting: {min: '10_SECONDS', max: '1_HOUR', change: 100},
+        description: 'Measured relative humidity',
+        unit: '%',
+        scale: 100,
+        valueMin: 0,
+        valueMax: 100,
+        readOnly: true,
+        ...args,
+    });
+}
+
+export function pressure(args?: Partial<NumericArgs>): ModernExtend {
+    return numeric({
+        name: 'pressure',
+        cluster: 'msPressureMeasurement',
+        attribute: 'measuredValue',
+        reporting: {min: '10_SECONDS', max: '1_HOUR', change: 100},
+        description: 'The measured atmospheric pressure',
+        unit: 'hPa',
+        scale: 100,
+        readOnly: true,
+        ...args,
+    });
 }
