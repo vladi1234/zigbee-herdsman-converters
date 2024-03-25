@@ -3,31 +3,34 @@ import * as exposes from '../lib/exposes';
 import fz from '../converters/fromZigbee';
 import tz from '../converters/toZigbee';
 import * as reporting from '../lib/reporting';
-import extend from '../lib/extend';
 const e = exposes.presets;
 const ea = exposes.access;
 import * as tuya from '../lib/tuya';
-import {onOff} from '../lib/modernExtend';
+import {deviceEndpoints, onOff} from '../lib/modernExtend';
 
 const definitions: Definition[] = [
     {
         fingerprint: [{modelID: 'TS011F', manufacturerName: '_TZ3000_air9m6af'}, {modelID: 'TS011F', manufacturerName: '_TZ3000_9djocypn'},
             {modelID: 'TS011F', manufacturerName: '_TZ3000_bppxj3sf'}],
-        zigbeeModel: ['JZ-ZB-005', 'E220-KR5N0Z0-HA'],
+        zigbeeModel: ['JZ-ZB-005', 'E220-KR5N0Z0-HA', 'E220-KR5N0Z0-HA'],
         model: 'WP33-EU/WP34-EU',
         vendor: 'LELLKI',
         description: 'Multiprise with 4 AC outlets and 2 USB super charging ports (16A)',
         toZigbee: [tuya.tz.power_on_behavior_2],
         fromZigbee: [tuya.fz.power_on_behavior_2],
         exposes: [e.power_on_behavior()],
-        extend: [onOff({endpoints: {l1: 1, l2: 2, l3: 3, l4: 4, l5: 5}, powerOnBehavior: false})],
+        configure: tuya.configureMagicPacket,
+        extend: [
+            deviceEndpoints({endpoints: {'l1': 1, 'l2': 2, 'l3': 3, 'l4': 4, 'l5': 5}}),
+            onOff({endpointNames: ['l1', 'l2', 'l3', 'l4', 'l5'], powerOnBehavior: false}),
+        ],
     },
     {
         zigbeeModel: ['JZ-ZB-001'],
         model: 'JZ-ZB-001',
         description: 'Smart plug (without power monitoring)',
         vendor: 'LELLKI',
-        extend: tuya.extend.switch({powerOutageMemory: true}),
+        extend: [tuya.modernExtend.tuyaOnOff({powerOutageMemory: true})],
         configure: async (device, coordinatorEndpoint, logger) => {
             const endpoint = device.getEndpoint(1);
             await reporting.bind(endpoint, coordinatorEndpoint, ['genOnOff']);
@@ -38,14 +41,20 @@ const definitions: Definition[] = [
         model: 'JZ-ZB-003',
         vendor: 'LELLKI',
         description: '3 gang switch',
-        extend: [onOff({endpoints: {l1: 1, l2: 2, l3: 3}})],
+        extend: [
+            deviceEndpoints({endpoints: {'l1': 1, 'l2': 2, 'l3': 3}}),
+            onOff({endpointNames: ['l1', 'l2', 'l3']}),
+        ],
     },
     {
         zigbeeModel: ['JZ-ZB-002'],
         model: 'JZ-ZB-002',
         vendor: 'LELLKI',
         description: '2 gang touch switch',
-        extend: [onOff({endpoints: {l1: 1, l2: 2}})],
+        extend: [
+            deviceEndpoints({endpoints: {'l1': 1, 'l2': 2}}),
+            onOff({endpointNames: ['l1', 'l2']}),
+        ],
     },
     {
         fingerprint: [{modelID: 'TS011F', manufacturerName: '_TZ3000_twqctvna'}],
@@ -59,7 +68,7 @@ const definitions: Definition[] = [
         model: 'XF-EU-S100-1-M',
         description: 'Touch switch 1 gang (with power monitoring)',
         vendor: 'LELLKI',
-        extend: tuya.extend.switch({powerOutageMemory: true, electricalMeasurements: true}),
+        extend: [tuya.modernExtend.tuyaOnOff({powerOutageMemory: true, electricalMeasurements: true})],
         configure: async (device, coordinatorEndpoint, logger) => {
             const endpoint = device.getEndpoint(1);
             await reporting.bind(endpoint, coordinatorEndpoint, ['genOnOff']);
@@ -75,7 +84,7 @@ const definitions: Definition[] = [
         model: 'WK34-EU',
         description: 'Power socket EU (with power monitoring)',
         vendor: 'LELLKI',
-        extend: tuya.extend.switch({powerOutageMemory: true, electricalMeasurements: true}),
+        extend: [tuya.modernExtend.tuyaOnOff({powerOutageMemory: true, electricalMeasurements: true})],
         configure: async (device, coordinatorEndpoint, logger) => {
             const endpoint = device.getEndpoint(1);
             await tuya.configureMagicPacket(device, coordinatorEndpoint, logger);
@@ -92,7 +101,6 @@ const definitions: Definition[] = [
         model: 'WP30-EU',
         description: 'Power cord 4 sockets EU (with power monitoring)',
         vendor: 'LELLKI',
-        extend: extend.switch(),
         fromZigbee: [fz.on_off_force_multiendpoint, fz.electrical_measurement, fz.metering, fz.ignore_basic_report,
             tuya.fz.power_outage_memory],
         toZigbee: [tz.on_off, tuya.tz.power_on_behavior_1],

@@ -1,3 +1,4 @@
+import {Zcl} from 'zigbee-herdsman';
 import * as exposes from '../lib/exposes';
 import fz from '../converters/fromZigbee';
 import * as legacy from '../lib/legacy';
@@ -5,14 +6,13 @@ import tz from '../converters/toZigbee';
 import * as constants from '../lib/constants';
 import * as utils from '../lib/utils';
 import * as reporting from '../lib/reporting';
-import extend from '../lib/extend';
 import {Definition, Fz, KeyValue, KeyValueAny, Tz} from '../lib/types';
 const e = exposes.presets;
 const ea = exposes.access;
 import {precisionRound} from '../lib/utils';
-import {onOff, electricityMeter} from '../lib/modernExtend';
+import {onOff, electricityMeter, light} from '../lib/modernExtend';
 
-const manuSinope = {manufacturerCode: 0x119C};
+const manuSinope = {manufacturerCode: Zcl.ManufacturerCode.SINOPE_TECHNOLOGIES};
 
 const fzLocal = {
     ias_water_leak_alarm: {
@@ -224,8 +224,8 @@ const fzLocal = {
                 result.minimum_brightness = msg.data['minimumBrightness'];
             }
             if (msg.data.hasOwnProperty('actionReport')) {
-                const lookup = {2: 'up_single', 3: 'up_hold', 4: 'up_double',
-                    18: 'down_single', 19: 'down_hold', 20: 'down_double'};
+                const lookup = {1: 'up_clickdown', 2: 'up_single', 3: 'up_hold', 4: 'up_double',
+                    17: 'down_clickdown', 18: 'down_single', 19: 'down_hold', 20: 'down_double'};
                 result.action = utils.getFromLookup(msg.data['actionReport'], lookup);
             }
             if (msg.data.hasOwnProperty('keypadLockout')) {
@@ -915,10 +915,13 @@ const definitions: Definition[] = [
         },
     },
     {
-        zigbeeModel: ['TH1300ZB'],
+        zigbeeModel: ['TH1300ZB', 'TH1320ZB-04'],
         model: 'TH1300ZB',
         vendor: 'Sinopé',
         description: 'Zigbee smart floor heating thermostat',
+        whiteLabel: [
+            {model: 'TH1320ZB-04', vendor: 'Sinopé', description: 'Zigbee smart floor heating thermostat', fingerprint: [{modelID: 'TH1320ZB-04'}]},
+        ],
         fromZigbee: [fzLocal.thermostat, fzLocal.sinope, legacy.fz.hvac_user_interface,
             fz.electrical_measurement, fz.metering, fz.ignore_temperature_report],
         toZigbee: [tz.thermostat_local_temperature, tz.thermostat_occupied_heating_setpoint, tz.thermostat_unoccupied_heating_setpoint,
@@ -1206,10 +1209,11 @@ const definitions: Definition[] = [
         model: 'DM2500ZB',
         vendor: 'Sinopé',
         description: 'Zigbee smart dimmer',
-        fromZigbee: [fz.on_off, fz.brightness, fz.electrical_measurement, fzLocal.sinope],
-        toZigbee: [tz.light_onoff_brightness, tzLocal.timer_seconds, tzLocal.led_intensity_on, tzLocal.led_intensity_off,
+        extend: [light({configureReporting: true})],
+        fromZigbee: [fzLocal.sinope],
+        toZigbee: [tzLocal.timer_seconds, tzLocal.led_intensity_on, tzLocal.led_intensity_off,
             tzLocal.minimum_brightness, tzLocal.led_color_on, tzLocal.led_color_off],
-        exposes: [e.light_brightness(),
+        exposes: [
             e.numeric('timer_seconds', ea.ALL).withUnit('s').withValueMin(0).withValueMax(65535)
                 .withPreset('Disabled', 0, 'disabled').withDescription('Automatically turn off load after x seconds'),
             e.numeric('led_intensity_on', ea.ALL).withUnit('%').withValueMin(0).withValueMax(100)
@@ -1228,24 +1232,17 @@ const definitions: Definition[] = [
                 .withFeature(e.numeric('g', ea.SET))
                 .withFeature(e.numeric('b', ea.SET))
                 .withDescription('Control status LED color when load OFF')],
-        configure: async (device, coordinatorEndpoint, logger) => {
-            await extend.light_onoff_brightness().configure(device, coordinatorEndpoint, logger);
-            const endpoint = device.getEndpoint(1);
-            const binds = ['genBasic', 'genLevelCtrl'];
-            await reporting.bind(endpoint, coordinatorEndpoint, binds);
-            await reporting.onOff(endpoint);
-            await reporting.brightness(endpoint);
-        },
     },
     {
         zigbeeModel: ['DM2550ZB'],
         model: 'DM2550ZB',
         vendor: 'Sinopé',
         description: 'Zigbee Adaptive phase smart dimmer',
-        fromZigbee: [fz.on_off, fz.brightness, fz.electrical_measurement, fzLocal.sinope],
-        toZigbee: [tz.light_onoff_brightness, tzLocal.timer_seconds, tzLocal.led_intensity_on, tzLocal.led_intensity_off,
+        extend: [light({configureReporting: true})],
+        fromZigbee: [fzLocal.sinope],
+        toZigbee: [tzLocal.timer_seconds, tzLocal.led_intensity_on, tzLocal.led_intensity_off,
             tzLocal.minimum_brightness, tzLocal.led_color_on, tzLocal.led_color_off],
-        exposes: [e.light_brightness(),
+        exposes: [
             e.numeric('timer_seconds', ea.ALL).withUnit('s').withValueMin(0).withValueMax(65535)
                 .withPreset('Disabled', 0, 'disabled').withDescription('Automatically turn off load after x seconds'),
             e.numeric('led_intensity_on', ea.ALL).withUnit('%').withValueMin(0).withValueMax(100)
@@ -1264,14 +1261,6 @@ const definitions: Definition[] = [
                 .withFeature(e.numeric('g', ea.SET))
                 .withFeature(e.numeric('b', ea.SET))
                 .withDescription('Control status LED color when load OFF')],
-        configure: async (device, coordinatorEndpoint, logger) => {
-            await extend.light_onoff_brightness().configure(device, coordinatorEndpoint, logger);
-            const endpoint = device.getEndpoint(1);
-            const binds = ['genBasic', 'genLevelCtrl'];
-            await reporting.bind(endpoint, coordinatorEndpoint, binds);
-            await reporting.onOff(endpoint);
-            await reporting.brightness(endpoint);
-        },
     },
     {
         zigbeeModel: ['SP2600ZB'],
@@ -1371,6 +1360,23 @@ const definitions: Definition[] = [
         },
     },
     {
+        zigbeeModel: ['WL4210'],
+        model: 'WL4210',
+        vendor: 'Sinopé',
+        description: 'Zigbee smart water leak detector with external sensor',
+        fromZigbee: [fz.ias_water_leak_alarm_1, fz.temperature, fz.battery],
+        toZigbee: [],
+        exposes: [e.water_leak(), e.battery_low(), e.temperature(), e.battery()],
+        configure: async (device, coordinatorEndpoint) => {
+            const endpoint = device.getEndpoint(1);
+            const binds = ['genPowerCfg', 'msTemperatureMeasurement'];
+            await reporting.bind(endpoint, coordinatorEndpoint, binds);
+            await reporting.temperature(endpoint, {min: 600, max: constants.repInterval.MAX, change: 100});
+            await reporting.batteryPercentageRemaining(endpoint);
+            await reporting.batteryAlarmState(endpoint);
+        },
+    },
+    {
         zigbeeModel: ['VA4200WZ'],
         model: 'VA4200WZ',
         vendor: 'Sinopé',
@@ -1436,7 +1442,7 @@ const definitions: Definition[] = [
         model: 'RM3500ZB',
         vendor: 'Sinopé',
         description: 'Calypso smart water heater controller',
-        extend: [onOff(), electricityMeter()],
+        extend: [onOff({powerOnBehavior: false}), electricityMeter()],
         fromZigbee: [fzLocal.ias_water_leak_alarm, fzLocal.sinope, fz.temperature],
         toZigbee: [tzLocal.low_water_temp_protection],
         exposes: [

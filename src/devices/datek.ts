@@ -1,3 +1,4 @@
+import {Zcl} from 'zigbee-herdsman';
 import * as exposes from '../lib/exposes';
 import fz from '../converters/fromZigbee';
 import tz from '../converters/toZigbee';
@@ -95,7 +96,7 @@ const definitions: Definition[] = [
             fz.ias_enroll, fz.ias_occupancy_alarm_1, fz.ias_occupancy_alarm_1_report, fz.led_on_motion],
         toZigbee: [tz.occupancy_timeout, tz.led_on_motion],
         configure: async (device, coordinatorEndpoint, logger) => {
-            const options = {manufacturerCode: 4919};
+            const options = {manufacturerCode: Zcl.ManufacturerCode.DATEK_WIRELESS_AS};
             const endpoint = device.getEndpoint(1);
             const binds = ['msIlluminanceMeasurement', 'msTemperatureMeasurement', 'msOccupancySensing', 'ssIasZone'];
             await reporting.bind(endpoint, coordinatorEndpoint, binds);
@@ -127,7 +128,7 @@ const definitions: Definition[] = [
         meta: {pinCodeCount: 109},
         configure: async (device, coordinatorEndpoint, logger) => {
             const endpoint = device.getEndpoint(1);
-            const options = {manufacturerCode: 4919};
+            const options = {manufacturerCode: Zcl.ManufacturerCode.DATEK_WIRELESS_AS};
             await reporting.bind(endpoint, coordinatorEndpoint, ['closuresDoorLock', 'genPowerCfg']);
             await reporting.lockState(endpoint);
             await reporting.batteryPercentageRemaining(endpoint);
@@ -178,7 +179,7 @@ const definitions: Definition[] = [
                 await device.endpoints[0].command('closuresDoorLock', 'getPinCode', {userid: data.data.userid}, {});
             }
         },
-        exposes: [e.lock(), e.battery(), e.pincode(),
+        exposes: [e.lock(), e.battery(), e.pincode(), e.door_state(),
             e.lock_action(), e.lock_action_source_name(), e.lock_action_user(),
             e.enum('sound_volume', ea.ALL, constants.lockSoundVolume).withDescription('Sound volume of the lock'),
             e.binary('master_pin_mode', ea.ALL, true, false).withDescription('Allow Master PIN Unlock'),

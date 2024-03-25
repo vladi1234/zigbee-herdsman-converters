@@ -1,3 +1,4 @@
+import {Zcl} from 'zigbee-herdsman';
 import * as exposes from '../lib/exposes';
 import fz from '../converters/fromZigbee';
 import * as legacy from '../lib/legacy';
@@ -8,6 +9,15 @@ const e = exposes.presets;
 const ea = exposes.access;
 
 const definitions: Definition[] = [
+    {
+        zigbeeModel: ['7377019'],
+        model: '7377019',
+        vendor: 'Viessmann',
+        description: 'ViCare CO2, temperature and humidity sensor',
+        fromZigbee: [fz.co2, fz.temperature, fz.humidity, fz.battery],
+        toZigbee: [],
+        exposes: [e.battery(), e.co2(), e.temperature(), e.humidity()],
+    },
     {
         zigbeeModel: ['7637435'],
         model: 'ZK03839',
@@ -41,7 +51,7 @@ const definitions: Definition[] = [
         ],
         configure: async (device, coordinatorEndpoint, logger) => {
             const endpoint = device.getEndpoint(1);
-            const options = {manufacturerCode: 0x1221};
+            const options = {manufacturerCode: Zcl.ManufacturerCode.VIESSMANN_ELEKTRONIK_GMBH};
             await reporting.bind(endpoint, coordinatorEndpoint, ['genBasic', 'genPowerCfg', 'genIdentify', 'genTime', 'hvacThermostat']);
 
             // standard ZCL attributes

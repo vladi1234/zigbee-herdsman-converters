@@ -8,7 +8,7 @@ const e = exposes.presets;
 const ea = exposes.access;
 import * as zigbeeHerdsman from 'zigbee-herdsman/dist';
 
-const manufacturerOptions = {manufacturerCode: zigbeeHerdsman.Zcl.ManufacturerCode.PLUGWISE_BV};
+const manufacturerOptions = {manufacturerCode: zigbeeHerdsman.Zcl.ManufacturerCode.PLUGWISE_B_V};
 
 const plugwisePushForce = {
     0: 'standard',
@@ -55,7 +55,7 @@ const tzLocal = {
         key: ['calibrate_valve'],
         convertSet: async (entity, key, value, meta) => {
             await entity.command('hvacThermostat', 'plugwiseCalibrateValve', {},
-                {srcEndpoint: 11, disableDefaultResponse: true, sendWhen: 'active'});
+                {srcEndpoint: 11, disableDefaultResponse: true});
             return {state: {'calibrate_valve': value}};
         },
     } satisfies Tz.Converter,

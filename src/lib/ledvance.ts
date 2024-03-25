@@ -5,7 +5,7 @@ import * as utils from '../lib/utils';
 import {Zcl} from 'zigbee-herdsman';
 import * as ota from '../lib/ota';
 
-const manufacturerOptions = {manufacturerCode: Zcl.ManufacturerCode.OSRAM};
+const manufacturerOptions = {manufacturerCode: Zcl.ManufacturerCode.OSRAM_SYLVANIA};
 
 export const ledvanceFz = {
     pbc_level_to_action: {
@@ -51,7 +51,7 @@ export function ledvanceOnOff(args?: modernExtend.OnOffArgs) {
 }
 
 export function ledvanceLight(args?: modernExtend.LightArgs) {
-    args = {powerOnBehaviour: false, ota: ota.ledvance, ...args};
+    args = {powerOnBehavior: false, ota: ota.ledvance, ...args};
     if (args.colorTemp) args.colorTemp.startup = false;
     if (args.color) args.color = {modes: ['xy', 'hs'], ...(isObject(args.color) ? args.color : {})};
     const result = modernExtend.light(args);

@@ -1,6 +1,6 @@
 import { repInterval } from '../src/lib/constants';
 import {philipsFz} from '../src/lib/philips';
-import {fromZigbee as xiaomiFz} from '../src/lib/xiaomi';
+import {fromZigbee as lumiFz} from '../src/lib/lumi';
 import fz from '../src/converters/fromZigbee'
 import { assertDefintion, mockDevice, reportingItem } from './utils';
 
@@ -176,16 +176,16 @@ describe('ModernExtend', () => {
                 {ID: 2, inputClusters: ['genOnOff']},
             ]}),
             meta: {multiEndpoint: true},
-            fromZigbee: [fz.on_off, fz.power_on_behavior],
-            toZigbee: ['state', 'on_time', 'off_wait_time', 'power_on_behavior'],
-            exposes: ['linkquality', 'power_on_behavior', 'switch_bottom(state)', 'switch_top(state)'],
+            fromZigbee: [fz.on_off],
+            toZigbee: ['state', 'on_time', 'off_wait_time'],
+            exposes: ['linkquality', 'switch_bottom(state)', 'switch_top(state)'],
             bind: {
                 1: ['genOnOff'],
                 2: ['genOnOff'],
             },
             read: {
-                1: [['genOnOff', ['onOff']], ['genOnOff', ['startUpOnOff']]],
-                2: [['genOnOff', ['onOff']], ['genOnOff', ['startUpOnOff']]],
+                1: [['genOnOff', ['onOff']]],
+                2: [['genOnOff', ['onOff']]],
             },
             configureReporting: {
                 1: [
@@ -207,12 +207,13 @@ describe('ModernExtend', () => {
             meta: {battery: {voltageToPercentage: '3V_2850_3000'}},
             fromZigbee: [
                 fz.battery,
-                xiaomiFz.aqara_opple,
-                expect.objectContaining({cluster: 'aqaraOpple'}),
+                lumiFz.lumi_specific,
+                expect.objectContaining({cluster: 'manuSpecificLumi'}),
                 expect.objectContaining({cluster: 'genAnalogInput'}),
                 expect.objectContaining({cluster: 'msTemperatureMeasurement'}),
                 expect.objectContaining({cluster: 'msRelativeHumidity'}),
-                expect.objectContaining({cluster: 'aqaraOpple'}),
+                expect.objectContaining({cluster: 'manuSpecificLumi'}),
+                expect.objectContaining({cluster: 'manuSpecificLumi'}),
             ],
             toZigbee: ['air_quality', 'voc', 'temperature', 'humidity', 'display_unit'],
             exposes: ['air_quality', 'battery', 'device_temperature', 'display_unit', 'humidity', 'linkquality', 'temperature', 'voc', 'voltage'],
@@ -222,11 +223,11 @@ describe('ModernExtend', () => {
             read: {
                 1: [
                     ['genPowerCfg', ['batteryVoltage']],
-                    ['aqaraOpple', ['airQuality']],
+                    ['manuSpecificLumi', ['airQuality']],
                     ['genAnalogInput', ['presentValue']],
                     ['msTemperatureMeasurement', ['measuredValue']],
                     ['msRelativeHumidity', ['measuredValue']],
-                    ['aqaraOpple', ['displayUnit']],
+                    ['manuSpecificLumi', ['displayUnit']],
                 ],
             },
             configureReporting: {

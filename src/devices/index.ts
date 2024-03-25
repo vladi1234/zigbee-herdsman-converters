@@ -21,6 +21,7 @@ import bankamp from './bankamp';
 import bega from './bega';
 import belkin from './belkin';
 import bitron from './bitron';
+import bituo_technik from './bituo_technik';
 import blaupunkt from './blaupunkt';
 import blitzwolf from './blitzwolf';
 import bosch from './bosch';
@@ -70,6 +71,7 @@ import enbrighten from './enbrighten';
 import enocean from './enocean';
 import envilar from './envilar';
 import essentialb from './essentialb';
+import eucontrols from './eucontrols';
 import eurotronic from './eurotronic';
 import evanell from './evanell';
 import evn from './evn';
@@ -99,7 +101,6 @@ import heiman from './heiman';
 import heimgard_technologies from './heimgard_technologies';
 import hej from './hej';
 import hfh from './hfh';
-import hgkg from './hgkg';
 import hilux from './hilux';
 import hive from './hive';
 import hommyn from './hommyn';
@@ -116,6 +117,7 @@ import iluminize from './iluminize';
 import ilux from './ilux';
 import imhotepcreation from './imhotepcreation';
 import immax from './immax';
+import imou from './imou';
 import innr from './innr';
 import inovelli from './inovelli';
 import insta from './insta';
@@ -178,6 +180,7 @@ import nanoleaf from './nanoleaf';
 import neo from './neo';
 import net2grid from './net2grid';
 import netvox from './netvox';
+import nexelec from './nexelec';
 import niko from './niko';
 import ninja_blocks from './ninja_blocks';
 import niviss from './niviss';
@@ -237,6 +240,7 @@ import smart9 from './smart9';
 import smartenit from './smartenit';
 import smartthings from './smartthings';
 import smartwings from './smartwings';
+import smlight from './smlight';
 import sohan_electric from './sohan_electric';
 import solaredge from './solaredge';
 import somfy from './somfy';
@@ -244,7 +248,6 @@ import somgoms from './somgoms';
 import sonoff from './sonoff';
 import sowilo from './sowilo';
 import spotmau from './spotmau';
-import sprut from './sprut';
 import stelpro from './stelpro';
 import sunricher from './sunricher';
 import swann from './swann';
@@ -270,16 +273,18 @@ import villeroy_boch from './villeroy_boch';
 import vimar from './vimar';
 import visonic from './visonic';
 import vrey from './vrey';
+import lumi from './lumi';
 import wally from './wally';
 import waxman from './waxman';
 import weiser from './weiser';
 import weten from './weten';
+import wirenboard from './wirenboard';
 import wisdom from './wisdom';
 import woolley from './woolley';
 import woox from './woox';
 import wyze from './wyze';
-import xiaomi from './xiaomi';
 import xinghuoyuan from './xinghuoyuan';
+import xyzroe from './xyzroe';
 import yale from './yale';
 import ynoa from './ynoa';
 import yookee from './yookee';
@@ -312,6 +317,7 @@ export default [
     ...bega,
     ...belkin,
     ...bitron,
+    ...bituo_technik,
     ...blaupunkt,
     ...blitzwolf,
     ...bosch,
@@ -361,6 +367,7 @@ export default [
     ...enocean,
     ...envilar,
     ...essentialb,
+    ...eucontrols,
     ...eurotronic,
     ...evanell,
     ...evn,
@@ -390,7 +397,6 @@ export default [
     ...heimgard_technologies,
     ...hej,
     ...hfh,
-    ...hgkg,
     ...hilux,
     ...hive,
     ...hommyn,
@@ -407,6 +413,7 @@ export default [
     ...ilux,
     ...imhotepcreation,
     ...immax,
+    ...imou,
     ...innr,
     ...inovelli,
     ...insta,
@@ -469,6 +476,7 @@ export default [
     ...neo,
     ...net2grid,
     ...netvox,
+    ...nexelec,
     ...niko,
     ...ninja_blocks,
     ...niviss,
@@ -528,6 +536,7 @@ export default [
     ...smartenit,
     ...smartthings,
     ...smartwings,
+    ...smlight,
     ...sohan_electric,
     ...solaredge,
     ...somfy,
@@ -535,7 +544,6 @@ export default [
     ...sonoff,
     ...sowilo,
     ...spotmau,
-    ...sprut,
     ...stelpro,
     ...sunricher,
     ...swann,
@@ -553,6 +561,7 @@ export default [
     ...tuya,
     ...ubisys,
     ...uhome,
+    ...lumi,
     ...universal_electronics_inc,
     ...vbled,
     ...vesternet,
@@ -565,12 +574,13 @@ export default [
     ...waxman,
     ...weiser,
     ...weten,
+    ...wirenboard,
     ...wisdom,
     ...woolley,
     ...woox,
     ...wyze,
-    ...xiaomi,
     ...xinghuoyuan,
+    ...xyzroe,
     ...yale,
     ...ynoa,
     ...yookee,
